@@ -27,14 +27,14 @@ A user can search by artist or artwork, browse different feature categories, and
 - Change the order of a selected painting. 
 
 ## What the page works out: 
-the Atelier page will analyze the selected artworks and generate a curatorial summary using data from the museum API. JavaScript will calculate the total number of paintings selected, the number of distinct artists represented, the oldest and the newest artwork in creation years, and the number of years covered by the exhibition. These calculations were updated whenever the user adds or removes an artwork. 
+the Atelier page will analyze the selected artworks and generate Curatorial Insights using data from the museum API. JavaScript will calculate the total number of paintings selected, the number of distinct artists represented, the oldest and the newest artwork in creation years, and the number of years covered by the exhibition. These calculations were updated whenever the user adds or removes an artwork. 
 
 ## Features: 
 - Discover Art: Search and browse public-domain artworks through the Art Institute of Chicago API.
 - Curate an Exhibition: Select, remove, and reorder up to six artworks.
 - Personalize the Gallery: Name the exhibition, choose a theme, and customize the museum atmosphere.
 - Explore the Exhibition: See selected paintings in an interactive gallery with different viewing angles. Clicking a painting reveals its description, artist, and museum location when available.
-- Curatorial Summary: Generate statistics from the selected artworks and save the exhibition locally in the browser.
+- Curatorial Insights: Generate statistics from the selected artworks and save the exhibition locally in the browser.
 
 
 

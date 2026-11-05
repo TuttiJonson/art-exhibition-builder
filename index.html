@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ATELIER — Curate your own art exhibition</title>
+  <meta name="description" content="Discover real paintings from the Art Institute of Chicago, choose up to six favorites, and display them in a virtual exhibition.">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/script.js" defer></script>
+</head>
+<body data-mode="studio">
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="brand">
+      <h1 class="wordmark">ATELIER.</h1>
+      <p class="subtitle">Your museum. Your vision.</p>
+    </div>
+    <nav class="header-actions" aria-label="Exhibition actions">
+      <button type="button" id="edit-btn" class="btn btn-secondary" hidden>Edit Exhibition</button>
+      <button type="button" id="new-btn" class="btn btn-quiet">New Exhibition</button>
+      <button type="button" id="collection-btn" class="btn btn-primary" aria-haspopup="dialog"><span>My Collection (<span id="collection-count">0</span>/6)</span></button>
+    </nav>
+  </header>
+
+  <main id="main" class="studio">
+
+    <!-- ============ DISCOVER ============ -->
+    <section id="discover" class="panel" aria-labelledby="discover-title">
+      <div class="panel-head">
+        <h2 id="discover-title">Discover</h2>
+        <a class="jump-link" href="#exhibition">Skip to your exhibition</a>
+      </div>
+
+      <form id="search-form" role="search" novalidate>
+        <label for="search-input">Search paintings</label>
+        <div class="search-row">
+          <input id="search-input" name="q" type="search" placeholder="Search an artist, artwork, or subject" autocomplete="off" aria-describedby="search-error">
+          <button type="submit" id="search-btn" class="btn btn-primary">Search</button>
+        </div>
+        <p id="search-error" class="field-error" role="alert"></p>
+      </form>
+
+      <div class="chips" role="group" aria-label="Browse categories">
+        <button type="button" class="chip" data-category="featured" aria-pressed="true">Featured</button>
+        <button type="button" class="chip" data-category="nature" aria-pressed="false">Nature</button>
+        <button type="button" class="chip" data-category="portraits" aria-pressed="false">Portraits</button>
+        <button type="button" class="chip" data-category="city" aria-pressed="false">City Life</button>
+      </div>
+
+      <h3 id="results-title" class="results-title">Featured paintings</h3>
+      <p id="discover-status" class="status-line" role="status" aria-live="polite"></p>
+      <p id="full-hint" class="hint" hidden>Gallery full — remove a painting to add another.</p>
+      <div id="results-region" class="results-region" aria-busy="false"></div>
+      <p class="source-note">Paintings and descriptions come from the <a href="https://api.artic.edu/docs/" target="_blank" rel="noopener">Art Institute of Chicago public API</a>. Only public-domain paintings with images are shown.</p>
+    </section>
+
+    <!-- ============ YOUR EXHIBITION ============ -->
+    <section id="exhibition" class="panel" aria-labelledby="exhibition-title">
+      <div class="panel-head editor-only">
+        <h2 id="exhibition-title" tabindex="-1">Your Exhibition</h2>
+        <a class="jump-link" href="#discover">Back to Discover</a>
+      </div>
+
+      <p id="storage-notice" class="notice" role="status" hidden></p>
+
+      <div class="stage-wrap">
+        <div class="gallery-heading" id="gallery-heading" hidden>
+          <p class="eyebrow">ATELIER PRESENTS</p>
+          <h2 id="gallery-title" tabindex="-1">Untitled Exhibition</h2>
+          <p id="gallery-theme" class="gallery-theme" hidden></p>
+        </div>
+
+        <div class="stage-frame" id="stage-frame">
+          <div class="stage" id="stage" data-wall="front" data-atmosphere="white-cube">
+            <div class="room" id="room">
+              <div class="ceiling" aria-hidden="true"></div>
+              <div class="floor" aria-hidden="true"></div>
+              <div class="wall wall-front" id="wall-front" role="group" aria-labelledby="wall-front-title">
+                <h3 class="wall-title" id="wall-front-title">Front Wall</h3>
+                <div class="wall-slots"></div>
+              </div>
+              <div class="wall wall-left" id="wall-left" role="group" aria-labelledby="wall-left-title">
+                <h3 class="wall-title" id="wall-left-title">Left Wall</h3>
+                <div class="wall-slots"></div>
+              </div>
+              <div class="wall wall-right" id="wall-right" role="group" aria-labelledby="wall-right-title">
+                <h3 class="wall-title" id="wall-right-title">Right Wall</h3>
+                <div class="wall-slots"></div>
+              </div>
+            </div>
+          </div>
+          <div class="empty-note" id="empty-note" role="status">
+            <p class="empty-title">Your gallery is waiting for its first masterpiece.</p>
+            <p>Choose a painting to bring your gallery to life.</p>
+          </div>
+        </div>
+
+        <div class="wall-nav" role="group" aria-label="Choose a wall to view">
+          <button type="button" class="chip" data-wall="front" aria-pressed="true">Front Wall</button>
+          <button type="button" class="chip" data-wall="left" aria-pressed="false">Left Wall</button>
+          <button type="button" class="chip" data-wall="right" aria-pressed="false">Right Wall</button>
+        </div>
+        <p class="counter editor-only" id="counter"><span id="counter-num">0</span> / 6 artworks</p>
+      </div>
+
+      <div class="editor editor-only">
+        <div class="field">
+          <label for="title-input">Exhibition title</label>
+          <input id="title-input" type="text" maxlength="80" placeholder="Untitled Exhibition" autocomplete="off">
+        </div>
+
+        <div class="field">
+          <label for="theme-select">Theme (optional)</label>
+          <select id="theme-select">
+            <option value="none">None</option>
+            <option value="Nature">Nature</option>
+            <option value="Dreams">Dreams</option>
+            <option value="Humanity">Humanity</option>
+            <option value="Color &amp; Light">Color &amp; Light</option>
+            <option value="custom">My Own Theme</option>
+          </select>
+          <div id="theme-custom-wrap" hidden>
+            <label for="theme-custom">Your theme (up to 80 characters)</label>
+            <input id="theme-custom" type="text" maxlength="80" autocomplete="off" aria-describedby="theme-count">
+            <p id="theme-count" class="hint">0 / 80</p>
+          </div>
+        </div>
+
+        <fieldset class="field atmosphere">
+          <legend>Gallery atmosphere</legend>
+          <div class="atmosphere-options">
+            <label class="swatch"><input type="radio" name="atmosphere" value="white-cube" checked><span class="swatch-chip swatch-white" aria-hidden="true"></span><span class="swatch-name">White Cube</span></label>
+            <label class="swatch"><input type="radio" name="atmosphere" value="warm"><span class="swatch-chip swatch-warm" aria-hidden="true"></span><span class="swatch-name">Warm Gallery</span></label>
+            <label class="swatch"><input type="radio" name="atmosphere" value="dark"><span class="swatch-chip swatch-dark" aria-hidden="true"></span><span class="swatch-name">Dark Gallery</span></label>
+          </div>
+        </fieldset>
+
+        <section class="selected" aria-labelledby="selected-title">
+          <h3 id="selected-title" tabindex="-1">Selected paintings</h3>
+          <p id="selected-empty" class="hint">No paintings yet. Use “Add to Exhibition” on any painting in Discover.</p>
+          <ol id="selected-list" class="selected-list"></ol>
+        </section>
+
+        <section class="insights" aria-labelledby="insights-title">
+          <h3 id="insights-title">Curatorial Insights</h3>
+          <div aria-live="polite">
+            <p id="insights-summary" class="insights-summary"></p>
+            <dl id="insights-stats" class="insights-stats"></dl>
+          </div>
+        </section>
+
+        <div class="finish">
+          <button type="button" id="finish-btn" class="btn btn-primary btn-large" aria-describedby="finish-hint" disabled>Finish Curating</button>
+          <button type="button" id="view-btn" class="btn btn-secondary btn-large" disabled>View Gallery</button>
+          <p id="finish-hint" class="hint">Add at least one painting to finish.</p>
+          <p id="save-status" class="hint" role="status"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>ATELIER is a class project. Artwork information and images: <a href="https://www.artic.edu/" target="_blank" rel="noopener">Art Institute of Chicago</a>. Museum displays change, so check the official website before you visit.</p>
+  </footer>
+
+  <p id="announcer" class="sr-only" role="status" aria-live="polite"></p>
+
+  <!-- ============ MY COLLECTION DRAWER ============ -->
+  <dialog id="drawer" class="dialog drawer" aria-labelledby="drawer-title">
+    <div class="dialog-inner">
+      <div class="dialog-bar">
+        <h2 id="drawer-title">My Collection (<span id="drawer-count">0</span>/6)</h2>
+        <button type="button" class="btn btn-secondary btn-small" data-close>Close</button>
+      </div>
+      <div id="drawer-empty" class="state state-empty" hidden>
+        <p>Your collection is empty. Add a painting to start exploring.</p>
+        <button type="button" class="btn btn-primary" id="browse-btn">Browse Artworks</button>
+      </div>
+      <ol id="drawer-list" class="drawer-list"></ol>
+    </div>
+  </dialog>
+
+  <!-- ============ EXPLORE THE ARTWORK ============ -->
+  <dialog id="details-dialog" class="dialog dialog-details" aria-labelledby="details-title">
+    <div class="dialog-inner">
+      <div class="dialog-bar">
+        <p class="eyebrow">Explore the Artwork</p>
+        <button type="button" class="btn btn-secondary btn-small" data-close>Close</button>
+      </div>
+      <div class="details-grid">
+        <figure class="details-figure" id="details-figure"></figure>
+        <div class="details-text">
+          <h2 id="details-title"></h2>
+          <p id="details-meta" class="details-meta"></p>
+          <div id="details-live" class="details-live" aria-live="polite"></div>
+          <p class="details-link"><a id="details-link" class="btn btn-secondary" href="https://www.artic.edu/" target="_blank" rel="noopener">View on Museum Website</a></p>
+          <p class="hint">Museum displays may change. Check the official website before visiting.</p>
+          <p class="hint">Artwork information: <a id="details-attribution" href="https://www.artic.edu/" target="_blank" rel="noopener">Art Institute of Chicago</a></p>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============ FINISH CURATING ============ -->
+  <dialog id="opening-dialog" class="dialog dialog-opening" aria-labelledby="opening-title">
+    <div class="dialog-inner opening">
+      <p class="eyebrow">ATELIER PRESENTS</p>
+      <h2 id="opening-title">Untitled Exhibition</h2>
+      <p id="opening-theme" class="opening-theme" hidden></p>
+      <p id="opening-count" class="opening-count"></p>
+      <p id="opening-insights" class="opening-insights"></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary btn-large" id="enter-btn">Enter My Gallery</button>
+        <button type="button" class="btn btn-secondary btn-large" data-close>Keep Editing</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============ NEW EXHIBITION CONFIRMATION ============ -->
+  <dialog id="confirm-dialog" class="dialog dialog-confirm" aria-labelledby="confirm-title">
+    <div class="dialog-inner">
+      <h2 id="confirm-title">New Exhibition</h2>
+      <p>Start a new exhibition? Your current selection will be replaced.</p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" id="confirm-new-btn">Start New</button>
+        <button type="button" class="btn btn-secondary" data-close>Cancel</button>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>

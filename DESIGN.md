@@ -1,6 +1,6 @@
 # ATELIER — Visual Design Specification
 
-**Version:** 1.1 · Required root-level design file for the beginner JavaScript assignment.
+**Version:** 1.2 · Matches `PRD.md` v2.2 · Required root-level design file for the beginner JavaScript assignment.
 
 The implementation in `css/styles.css` and `index.html` MUST follow this file. `PRD.md` contains functionality, API, state, security, and acceptance rules (including input guards, safe text rendering, and the New Exhibition confirmation). If implementation changes these visual design choices, update this file rather than allowing it to drift out of sync.
 
@@ -26,7 +26,7 @@ Use a single set of CSS custom properties on `:root`, and reuse them across page
 | `--color-bg` | `#F7F6F2` | App background |
 | `--color-surface` | `#FFFFFF` | Cards, modal surfaces |
 | `--color-ink` | `#242424` | Main text and filled primary buttons |
-| `--color-muted` | `#77736E` | Secondary text |
+| `--color-muted` | `#6B6762` | Secondary text (5.19:1 on `--color-bg`, 5.61:1 on `--color-surface`; do not place it on the Warm Gallery wall, where it measures 4.15:1) |
 | `--color-border` | `#DEDAD3` | Dividers, field borders |
 | `--color-focus` | `#2656A8` | Clearly visible keyboard focus |
 | `--color-error` | `#A33B32` | Error text and error boundary |
@@ -49,8 +49,8 @@ Breakpoints and column splits are defined once, in Section 6.
 ### Studio — default screen
 
 - Header, left-aligned ATELIER wordmark and subtitle; right-aligned always-visible `My Collection (N/6)` and unobtrusive `New Exhibition`.
-- Discover includes a labeled search field/button, horizontal/wrapping featured category chips, status/message line, then an artwork card grid. Cards show real artwork image contained within its box, title, artist, and Add/Added button. Avoid cropping paintings.
-- Gallery + Editor includes a visually prominent CSS gallery preview, wall buttons `Front`, `Left`, `Right`, three atmosphere swatches with readable names, exhibition title/theme controls, a selected-works list with move/remove actions, **Curatorial Insights**, `Preview Gallery`, and primary `Finish Curating` button.
+- Discover includes a labeled search field/button, horizontal/wrapping featured category chips, status/message line, then an artwork card grid. Cards show real artwork image contained within its box, title, artist, an `Explore` button, and an `Add to Exhibition` button that becomes the label `In your exhibition` once added. Avoid cropping paintings.
+- Gallery + Editor includes a visually prominent CSS gallery preview, wall buttons `Front Wall`, `Left Wall`, `Right Wall`, three atmosphere swatches with readable names, exhibition title/theme controls, a selected-works list with move/remove actions, **Curatorial Insights**, an optional `View Gallery` (which never replaces the Finish Curating reveal), and primary `Finish Curating` button.
 - Required controls are always visible; never reveal them only on hover.
 
 ### Gallery — expanded presentation
@@ -58,7 +58,7 @@ Breakpoints and column splits are defined once, in Section 6.
 - Reuse the exact same DOM gallery stage as in Studio; enlarge its container with a CSS class instead of creating a new gallery or fetching art again.
 - Light-touch overlay: title/theme at upper left; `My Collection` and `Edit Exhibition` at upper right; three wall-view buttons at bottom.
 - Paintings are native HTML buttons containing an `<img>`. Clicking one opens the same `Explore the Artwork` detail component accessible from the collection drawer.
-- For small screens, a 2D wall/cards layout is an acceptable alternative to unreadably small perspective artwork.
+- Below 600px, the 2D wall layout replaces the perspective room (see Section 6).
 
 ### Opening overlay — after Finish Curating
 
@@ -67,32 +67,37 @@ Breakpoints and column splits are defined once, in Section 6.
 
 ### My Collection drawer / Artwork Details
 
-- Drawer opens from right on desktop and as a near-full-screen panel on narrow mobile. Selected paintings shown as a stacked list with thumbnails, artists, and `Explore` actions. Empty and error states are in Section 7.
-- Artwork Details is an accessible dialog/panel with image, title, artist, date, description heading, clearly separated **Held by / Collection**, **Currently on view** (if known), **Place of origin** (only if provided), and **View on Museum Website** link.
+- Drawer opens from right on desktop and as a near-full-screen panel on narrow mobile. Selected paintings shown as a stacked list with thumbnails, artists, and `Explore` actions (accessible name: `Explore the Artwork`, e.g. `Explore Water Lilies by Claude Monet`). The empty state is in Section 7; opening Explore from the drawer uses the details dialog's own loading and error states.
+- Artwork Details is an accessible dialog/panel with image, title, artist, date, description heading, clearly separated **Held by / Collection**, **Currently on view** (always shown; reads `Current display status unavailable` when the museum gives no data), **Place of origin** (only if provided), and **View on Museum Website** link.
 - Always retain a visible Close control and keyboard focus.
 
 ## 5. CSS-perspective gallery atmospheres
 
 All three styles use the **same wall geometry and six positions** (two paintings per wall). Only room colors, CSS lighting effects, and floor styling change. The app shell stays neutral when an atmosphere changes.
 
-| Preset | Wall | Floor | Shadow/highlight |
+Define three room tokens on the room element (defaults are the White Cube values) and override them per atmosphere with a `data-atmosphere` attribute, for example `.room[data-atmosphere="dark"]`. Room CSS uses only these tokens, never the raw hex values.
+
+| Preset (`data-atmosphere`) | `--room-wall` | `--room-floor` | `--room-glow` |
 |---|---|---|---|
-| White Cube (default) | `#F7F6F2` (same value as `--color-bg`, by design) | `#D9D5CF` | Soft neutral |
-| Warm Gallery | `#E8DCC9` | `#BFA88C` | Warm diffuse |
-| Dark Gallery | `#262626` | `#4A4541` | Gentle focused glow; art remains legible |
+| White Cube (`white-cube`, default) | `#F7F6F2` (same value as `--color-bg`, by design) | `#D9D5CF` | `rgba(255,255,255,0.35)` soft neutral |
+| Warm Gallery (`warm`) | `#E8DCC9` | `#BFA88C` | `rgba(255,214,150,0.30)` warm diffuse |
+| Dark Gallery (`dark`) | `#262626` | `#4A4541` | `rgba(255,244,220,0.18)` gentle focused glow; art remains legible |
+
+The room's container has a defined edge in every atmosphere, so the White Cube wall (the same color as the page) does not disappear into the shell: 1px `--color-border` border, `--radius-md` corners, and a soft shadow such as `0 8px 24px rgba(0,0,0,0.08)`.
 
 Each selected painting must retain natural proportions (`object-fit: contain`). A missing or broken image should show a neutral frame/placeholder, not an unrelated image.
 
 ## 6. Responsive behavior
 
 - **Desktop >= 1000px:** Two columns, Discover 45% and Gallery + Editor 55%, separated by a clear 24px gap; artwork cards two columns.
-- **Tablet 600–999px:** One-column Studio; gallery preview prominent above its controls; Discover still easily reachable. Consider two-column artwork cards where space permits.
-- **Mobile <= 599px:** Single-column layout; gallery stage is compact or replaced with accessible 2D cards; buttons have approximately 44px minimum touch targets; drawer/overlay nearly full-width; no sideways scrolling at 375px.
+- **One-column order (below 1000px):** Discover comes first, then Your Exhibition. A visible link in each section jumps to the other (`Skip to your exhibition` / `Back to Discover`), and the `My Collection (N/6)` button stays in the header.
+- **Tablet 600–999px:** One-column Studio; gallery preview prominent above its controls. Consider two-column artwork cards where space permits.
+- **Mobile <= 599px:** Single-column layout; the perspective room is replaced by the accessible 2D wall layout (six slots grouped under Front, Left and Right headings, same Explore buttons); buttons have approximately 44px minimum touch targets; drawer/overlay nearly full-width; no sideways scrolling at 375px.
 - Preserve accessible zoom behavior; do not disable browser zoom. Avoid position-fixed controls that hide content behind an on-screen keyboard.
 
-## 7. Six required data/UI states — exact visual placement
+## 7. Five required data/UI states — exact visual placement
 
-These states must match PRD Section 9A. Error messages are inline, not JavaScript `alert()` dialogs. Input guards (full gallery, duplicate artwork, Finish with zero artworks) and their copy are defined in the PRD.
+The five states are Empty, Loading, Error, Invalid input, and In use. Empty covers two cases (initial collection and zero search results); Loading and Error each cover two places (Discover results and the details dialog). These states must match PRD Section 9. Error messages are inline, not JavaScript `alert()` dialogs. Input guards (full gallery, duplicate artwork, Finish with zero artworks) and their copy are defined in the PRD.
 
 | State | Where | Visual appearance | Required copy/action |
 |---|---|---|---|
@@ -105,10 +110,22 @@ These states must match PRD Section 9A. Error messages are inline, not JavaScrip
 
 Never use red for expected empty results.
 
+### Guarded interactions — placement
+
+Expected limits use muted text; only real failures use the error red. Copy is defined in PRD Section 9.
+
+| Message | Where | Look |
+|---|---|---|
+| `Gallery full — remove a painting to add another.` | Under the Discover status line, and as `aria-describedby` text on each disabled Add button | Muted text |
+| `Add at least one painting to finish.` | Directly under the disabled `Finish Curating` button | Muted text |
+| `Changes cannot be saved in this browser.` | Slim notice at the top of Your Exhibition, visible for as long as saving fails | Neutral bordered strip, `role="status"` |
+| Corrupted-storage recovery notice | Same strip, dismissible | Neutral bordered strip, `role="status"` |
+| `Start a new exhibition? Your current selection will be replaced.` | Centered `<dialog>` with `Start New` and `Cancel` | Standard modal rules from Section 8 |
+
 ## 8. Accessibility and interaction details
 
 - Semantic `header`, `main`, `section`, `nav` (where applicable), `form`, `label`, `button`, and `dialog`/modal semantics. No click-only `<div>` masquerading as a button.
-- All important actions keyboard accessible; visible `:focus-visible` outlines with `--color-focus` (at least 2px). Keep text legible at WCAG AA contrast where practicable.
+- All important actions keyboard accessible; visible `:focus-visible` outlines with `--color-focus` (at least 2px). Keep text legible at WCAG AA contrast where practicable. Inside the gallery room (all three atmospheres), painting buttons use a two-layer focus ring, a 2px `#FFFFFF` inner ring plus a 2px `--color-focus` outer ring (for example `box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px var(--color-focus)`), because `--color-focus` alone measures only 2.15:1 against the Dark Gallery wall.
 - Decorative room elements have `aria-hidden="true"`. Actual artwork controls expose meaningful accessible names (e.g. `Explore Water Lilies by Claude Monet`).
 - `aria-live="polite"` for loading/status and summary updates; avoid incessant screen-reader announcements while typing.
 - Every modal, overlay, and drawer: move focus in, Escape closes, return focus to trigger.
@@ -122,7 +139,7 @@ Requirements are defined in the sections above; this list is for final verificat
 - [ ] No external styles/scripts/fonts/assets apart from museum API artwork data/images (§2).
 - [ ] The Studio loads without sign-in or intro form; collection control is obvious (§1, §4).
 - [ ] Users can tell which wall is selected and which atmosphere is active without relying on color alone (§4, §5).
-- [ ] All six states in §7 have visibly distinct designed treatments.
+- [ ] All five states in §7 have visibly distinct designed treatments.
 - [ ] Artwork details clearly distinguish holding museum from current display location and offer a real museum page link (§4).
 - [ ] No horizontal overflow at 375px; controls are comfortably touchable (§6).
 - [ ] End-to-end gallery and details work with keyboard only (§8).
