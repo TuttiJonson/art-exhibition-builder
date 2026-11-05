@@ -195,7 +195,6 @@ const els = {
   detailsTitle: $('details-title'),
   detailsMeta: $('details-meta'),
   detailsLive: $('details-live'),
-  detailsLink: $('details-link'),
   detailsAttribution: $('details-attribution'),
   openingDialog: $('opening-dialog'),
   openingTitle: $('opening-title'),
@@ -1107,7 +1106,6 @@ function openArtworkDetails(art, opener) {
   els.detailsTitle.textContent = art.title;
   els.detailsMeta.textContent = [art.artist || 'Artist unknown', art.dateLabel].filter(Boolean).join(' · ');
   els.detailsFigure.replaceChildren(artImage(art));
-  els.detailsLink.href = art.sourceUrl;
   els.detailsAttribution.href = art.sourceUrl;
 
   if (!els.detailsDialog.open) els.detailsDialog.showModal();
