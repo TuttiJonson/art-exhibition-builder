@@ -1,4 +1,36 @@
 'use strict';
+// ^ "Strict mode" makes JavaScript complain about common mistakes (like typing a variable name
+//   wrong) instead of silently ignoring them. It is good practice to start every file with it.
+
+/* ==========================================================================
+   HOW TO READ THIS FILE (for beginners)
+
+   The big idea: the app keeps ALL of its data in one JavaScript object (called "exhibition").
+   Whenever the data changes, we (1) save it, then (2) redraw the page from that data.
+   The page is never the "source of truth" — the data is.
+
+       user clicks a button
+              |
+              v
+       change the data  (section 9: addArtwork, removeArtwork, moveArtwork)
+              |
+              v
+       save to localStorage  (section 8)
+              |
+              v
+       redraw the page from the data  (section 10: render functions)
+
+   Where the museum's data comes from: the Art Institute of Chicago has a free public API.
+   An API is just a web address that returns data (as JSON text) instead of a web page.
+   We "fetch" that data, clean it up (section 6), and show it as cards (section 11).
+
+   Useful words:
+     const / let   - make a named box for a value. const can't be re-assigned, let can.
+     function      - a named, reusable block of code.
+     async / await - lets us wait for something slow (like the internet) without freezing the page.
+     DOM           - the page's elements as JavaScript sees them (buttons, text, images...).
+     event         - something the user does (click, type, submit) that our code can react to.
+   ========================================================================== */
 
 /* ==========================================================================
    ATELIER — plain JavaScript, no libraries.
@@ -21,8 +53,13 @@
 
 
 /* ---------- 1. Constants ---------- */
+// "Constants" are values that never change while the app runs. Putting them at the top means
+// you can tweak the app (e.g. allow 8 paintings) in ONE place instead of hunting through the code.
+// By convention, constants are written in CAPITAL_LETTERS.
 
+// The Art Institute of Chicago API. Every request starts with this address.
 const API_BASE = 'https://api.artic.edu/api/v1';
+// IIIF is the museum's image server. An image's address is built from this + the image's id (see normalizeArtwork).
 const IIIF_DEFAULT = 'https://www.artic.edu/iiif/2';
 const MUSEUM_SITE = 'https://www.artic.edu';
 
@@ -30,8 +67,9 @@ const MAX_ARTWORKS = 6;
 const MAX_TITLE = 80;
 const MAX_THEME = 80;
 const MAX_QUERY = 120;
-const REQUEST_LIMIT = 16;   // ask the museum for a few extra...
-const DISPLAY_LIMIT = 12;   // ...and show up to 12 eligible paintings
+const REQUEST_LIMIT = 22;   // ask the museum for a few extra...
+const DISPLAY_LIMIT = 18;   // ...and show up to 18 eligible paintings
+// localStorage saves data under a "key" (like a label on a drawer). We use this label to find our exhibition again.
 const STORAGE_KEY = 'atelier-exhibition-v2';
 
 const FULL_MESSAGE = 'Gallery full — remove a painting to add another.';
@@ -40,7 +78,7 @@ const INVALID_LONG = 'Keep your search under 120 characters.';
 
 // Each category button sends a different museum search ("Featured" uses the museum's own highlights instead).
 const CATEGORY_QUERIES = { nature: 'landscape', portraits: 'portrait', city: 'city' };
-const CATEGORY_LABELS = { featured: 'Featured', nature: 'Nature', portraits: 'Portraits', city: 'City Life' };
+const CATEGORY_LABELS = { featured: 'Featured', nature: 'Nature', portraits: 'Portraits', city: 'City Life', abstract: 'Abstract & Contemporary' };
 
 const THEMES = ['Nature', 'Dreams', 'Humanity', 'Color & Light'];
 const ATMOSPHERES = ['white-cube', 'warm', 'dark'];
@@ -54,11 +92,15 @@ const SLOT_WORDS = {
   right: ['first', 'second']
 };
 
+// The museum API can return hundreds of fields per artwork. Asking only for the ones we need
+// ("fields=...") makes responses smaller and faster. Each list is joined into one comma-separated
+// string, e.g. "id,title,artist_title,...". 'thumbnail.alt_text' means "the alt_text inside thumbnail".
 const SEARCH_FIELDS = [
   'id', 'title', 'artist_title', 'date_display', 'date_start',
-  'image_id', 'is_public_domain', 'artwork_type_title', 'thumbnail.alt_text'
+  'image_id', 'is_public_domain', 'artwork_type_title', 'thumbnail.alt_text', 'subject_titles', 'style_title'
 ].join(',');
 
+// Fields for the "Explore the Artwork" dialog: the story, medium, and where the painting is displayed.
 const DETAIL_FIELDS = [
   'id', 'title', 'artist_title', 'date_display', 'medium_display', 'place_of_origin',
   'short_description', 'description', 'is_on_view', 'gallery_title', 'on_loan_display', 'image_id'
@@ -66,6 +108,11 @@ const DETAIL_FIELDS = [
 
 
 /* ---------- 2. State ---------- */
+// "State" = the app's memory: everything it needs to remember right now.
+// There are two kinds, kept apart on purpose:
+//   exhibition -> the user's real work. Saved to the browser, survives a page refresh.
+//   ui         -> temporary things (current search results, which wall is showing). Lost on refresh.
+// "let" is used for exhibition because we replace the whole object when starting a new exhibition.
 
 // The ONE exhibition object (PRD section 10). Only this is saved to localStorage.
 let exhibition = createEmptyExhibition();
@@ -75,6 +122,8 @@ const ui = {
   wall: 'front',
   results: [],
   lastRequest: { kind: 'featured' },
+  // The "Seq" numbers and "Controller" objects handle slow internet: if you search twice quickly,
+  // the first (older) answer must not overwrite the second. See loadDiscover() for how they work.
   searchSeq: 0,
   searchController: null,
   detailSeq: 0,
@@ -87,6 +136,11 @@ const ui = {
 
 
 /* ---------- 3. Page elements ---------- */
+// JavaScript can't change a button or heading until it has "grabbed" it from the HTML.
+// document.getElementById('x') finds the element in index.html that has id="x".
+// Below, "$" is just a short nickname for that long function, and "els" collects every
+// element we need into one tidy object (e.g. els.searchInput is the search box).
+// "(id) => ..." is an arrow function: a short way of writing a small function.
 
 const $ = (id) => document.getElementById(id);
 
@@ -124,6 +178,8 @@ const els = {
   selectedList: $('selected-list'),
   insightsSummary: $('insights-summary'),
   insightsStats: $('insights-stats'),
+  reflection: $('insights-reflection'),
+  reflectionShared: $('insights-shared'),
   finishBtn: $('finish-btn'),
   finishHint: $('finish-hint'),
   viewBtn: $('view-btn'),
@@ -146,6 +202,7 @@ const els = {
   openingTheme: $('opening-theme'),
   openingCount: $('opening-count'),
   openingInsights: $('opening-insights'),
+  openingReflection: $('opening-reflection'),
   enterBtn: $('enter-btn'),
   confirmDialog: $('confirm-dialog'),
   confirmNewBtn: $('confirm-new-btn')
@@ -156,8 +213,13 @@ const slotEls = [];
 
 
 /* ---------- 4. Small helpers ---------- */
+// Little tools used all over the file.
 
 // Builds an element safely. Text is always added as plain text, never as HTML.
+// Example:  el('p', { class: 'hint', text: 'Hello' })   ->   <p class="hint">Hello</p>
+// Why not write HTML strings? Putting text from the internet into HTML can let attackers sneak in
+// malicious code (called XSS). Using textContent treats everything as harmless plain text.
+// "...children" means "any number of extra arguments", which become the element's contents.
 function el(tag, props = {}, ...children) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(props)) {
@@ -172,10 +234,13 @@ function el(tag, props = {}, ...children) {
   return node;
 }
 
+// plural(1, 'artist') -> 'artist';  plural(3, 'artist') -> 'artists'
 function plural(count, singular, pluralWord) {
   return count === 1 ? singular : (pluralWord || singular + 's');
 }
 
+// Each wall holds 2 paintings, so painting #0,1 -> front, #2,3 -> left, #4,5 -> right.
+// Math.floor(index / 2) rounds down: 0,1 -> 0   2,3 -> 1   4,5 -> 2.
 function wallOfIndex(index) { return WALLS[Math.floor(index / 2)]; }
 
 function slotLabel(index) {
@@ -183,6 +248,7 @@ function slotLabel(index) {
   return `${WALL_LABELS[wall]} · ${SLOT_WORDS[wall][index % 2]}`;
 }
 
+// .some() asks "does ANY painting in the list match?" and answers true or false.
 function isSelected(id) { return exhibition.artworks.some((a) => a.id === id); }
 function isFull() { return exhibition.artworks.length >= MAX_ARTWORKS; }
 
@@ -190,6 +256,9 @@ function describeArt(art) {
   return art.artist ? `${art.title} by ${art.artist}` : art.title;
 }
 
+// Screen-reader users can't see changes on screen, so we write messages into a hidden
+// "live region" (#announcer) and the screen reader reads them out loud.
+// Clearing it first, then setting the text after a tiny delay, makes sure repeated messages are re-read.
 function announce(message) {
   els.announcer.textContent = '';
   window.setTimeout(() => { els.announcer.textContent = message; }, 40);
@@ -220,11 +289,23 @@ function htmlToParagraphs(html) {
 
 
 /* ---------- 5. Talking to the museum ---------- */
+// THE API IN A NUTSHELL
+//   1. We build a web address (URL) describing what we want, e.g. ".../artworks/search?query...".
+//   2. fetch(url) sends the request over the internet and gives back a "Response".
+//   3. response.json() turns the text the museum sent back into a JavaScript object.
+//   4. We read the data we need from that object.
+// Each step can fail (no internet, server error, odd data), so each step is checked.
 
 // Every request goes through this one function: await fetch inside try/catch,
 // response.ok checked BEFORE reading JSON, and the JSON body checked afterwards.
+// "async" marks a function that does slow work; inside it, "await" means "pause HERE until the
+// answer arrives, then continue" (the rest of the page keeps working while we wait).
+// "signal" lets us cancel the request if the user starts a newer search (see AbortController later).
 async function fetchMuseumData(url, { signal } = {}) {
   let response;
+  // STEP 1 — send the request. try/catch: if anything inside "try" throws an error,
+  // the code jumps into "catch" instead of crashing. fetch() only fails like this when
+  // there's no connection at all (offline, blocked, DNS problem).
   try {
     response = await fetch(url, { signal });
   } catch (error) {
@@ -232,10 +313,14 @@ async function fetchMuseumData(url, { signal } = {}) {
     throw new Error('Could not reach the museum (network problem).');
   }
 
+  // STEP 2 — did the server say "OK"? HTTP status codes: 200 = fine, 404 = not found, 500 = server broke.
+  // fetch() does NOT treat 404/500 as errors, so we must check response.ok ourselves.
   if (!response.ok) {   // a 404 or 500 does not throw by itself, so we check
     throw new Error(`Museum API returned HTTP ${response.status}`);
   }
 
+  // STEP 3 — turn the text into a JavaScript object. This can fail if the server sent something
+  // that isn't valid JSON (e.g. an error web page), so it gets its own try/catch.
   let json;
   try {
     json = await response.json();
@@ -243,6 +328,8 @@ async function fetchMuseumData(url, { signal } = {}) {
     throw new Error('The museum API sent data that could not be read.');
   }
 
+  // STEP 4 — check the shape. The museum wraps its results in a "data" property. If it's missing
+  // (or the API reports an "error"), we treat the response as unusable.
   if (!json || json.error || !json.data) {
     throw new Error('The museum API returned an unexpected response.');
   }
@@ -251,7 +338,16 @@ async function fetchMuseumData(url, { signal } = {}) {
 
 // Builds the search address. The museum's search text goes INSIDE the query (not "q="),
 // because "q=" is ignored once filters are added.
+//
+// Example of a finished address (shortened):
+//   https://api.artic.edu/api/v1/artworks/search?limit=22&fields=id,title,...
+//     &query[bool][filter][0][term][is_public_domain]=true
+//     &query[bool][filter][1][term][artwork_type_title.keyword]=Painting
+// Read the "query[...]" parts as a filter list: "only public-domain" AND "only paintings" AND ...
+// "request" says what the user asked for: { kind: 'featured' } | { kind: 'category', key } | { kind: 'search', text }
 function buildDiscoverUrl(request, { publicDomain = true } = {}) {
+  // URLSearchParams builds the "?name=value&name2=value2" part and safely encodes odd characters
+  // (spaces, accents, &) so they can't break the address.
   const params = new URLSearchParams();
   params.set('limit', String(publicDomain ? REQUEST_LIMIT : 40));
   params.set('fields', SEARCH_FIELDS);
@@ -261,7 +357,16 @@ function buildDiscoverUrl(request, { publicDomain = true } = {}) {
 
   if (request.kind === 'featured') {
     params.set('query[bool][filter][2][term][is_boosted]', 'true');   // the museum's own highlights
+  } else if (request.kind === 'category' && request.key === 'abstract') {
+    // Uses the museum's own "modern and contemporary art" label instead of a text guess, and
+    // leaves out Impressionism so the results lean toward abstract and modernist work.
+    params.set('query[bool][filter][2][term][classification_titles.keyword]', 'modern and contemporary art');
+    params.set('query[bool][must_not][0][term][style_title.keyword]', 'Impressionism');
+    params.set('query[bool][must_not][1][term][style_title.keyword]', 'Post-Impressionism');
   } else {
+    // A text search (typed by the user, or a category like Nature -> "landscape").
+    // "multi_match" searches several fields at once; the ^5 / ^3 mean "a match in artist counts
+    // 5x, in title 3x" so searching "Monet" ranks Monet's own paintings first.
     const text = request.kind === 'category' ? CATEGORY_QUERIES[request.key] : request.text;
     const mm = 'query[bool][must][0][multi_match]';
     params.set(`${mm}[query]`, text);
@@ -275,6 +380,7 @@ function buildDiscoverUrl(request, { publicDomain = true } = {}) {
 }
 
 // Lowercase, no accents, so "de Kooning" matches "De Kooning" and "Miró" matches "miro".
+// .normalize('NFD') splits "é" into "e" + an accent mark; the regex then deletes the accent marks.
 function foldText(text) {
   return String(text).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
@@ -302,14 +408,31 @@ async function findCopyrightedArtist(request, signal) {
   return '';
 }
 
+// A second, separate API call: ask for ONE artwork by its id (".../artworks/27992?fields=...").
+// Used only when the user opens "Explore the Artwork".
 function buildDetailUrl(id) {
   return `${API_BASE}/artworks/${id}?fields=${DETAIL_FIELDS}`;
 }
 
 
 /* ---------- 6. Turning API data into our own artwork records ---------- */
+// The museum's data is big, messy and sometimes missing pieces. Instead of using it directly,
+// we copy only what we need into a small, predictable "artwork record". The rest of the app
+// then only ever deals with our clean records. This is called "normalizing" data.
+
+// Keeps the museum's subject tags (like "water" or "mothers") as short lowercase text. Used only for the reflection.
+function cleanSubjects(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((t) => typeof t === 'string' && t.trim())
+    .map((t) => t.trim().toLowerCase().slice(0, 60))
+    .slice(0, 16);
+}
 
 // Returns a small clean record, or null if this result is not an eligible public-domain painting with an image.
+// "raw" is one artwork exactly as the museum sent it. Returning null means "skip this one".
+// The ifs below are a checklist: no id, no title, no image, not public domain, not a painting -> skip.
+// (Public domain = no copyright, so we're allowed to show it.)
 function normalizeArtwork(raw, iiifBase = IIIF_DEFAULT) {
   if (!raw || !Number.isInteger(raw.id)) return null;
   if (typeof raw.title !== 'string' || !raw.title.trim()) return null;
@@ -320,6 +443,10 @@ function normalizeArtwork(raw, iiifBase = IIIF_DEFAULT) {
   const title = raw.title.trim();
   const altFromMuseum = raw.thumbnail && typeof raw.thumbnail.alt_text === 'string' ? raw.thumbnail.alt_text.trim() : '';
 
+  // The clean record. "title," on its own is shorthand for "title: title,".
+  // artistKey is a lowercase copy used to compare artists ("Monet" and "monet" count as one).
+  // imageUrl is built from the image server address + the image id + size/format options
+  // ("full/843,/0/default.jpg" = full picture, 843px wide, no rotation, jpg).
   return {
     id: raw.id,
     title,
@@ -327,6 +454,7 @@ function normalizeArtwork(raw, iiifBase = IIIF_DEFAULT) {
     artistKey: artist.toLowerCase(),
     dateLabel: typeof raw.date_display === 'string' ? raw.date_display.trim() : '',
     startYear: Number.isFinite(raw.date_start) ? raw.date_start : null,
+    subjects: cleanSubjects(raw.subject_titles),
     imageId: raw.image_id,
     imageUrl: `${iiifBase}/${raw.image_id}/full/843,/0/default.jpg`,
     altText: altFromMuseum || (artist ? `${title} by ${artist}` : title),
@@ -338,6 +466,8 @@ function normalizeArtwork(raw, iiifBase = IIIF_DEFAULT) {
 /* ---------- 7. Curatorial Insights: the calculated output ---------- */
 
 // Pure function: selected paintings in, numbers out. It never touches the page.
+// ("Pure" = same input always gives the same output, and nothing else changes. Easy to test!)
+// This is the app's calculated output: how many artists, the earliest/latest year, and the time span.
 function calculateInsights(artworks) {
   const artistKeys = new Set();       // a Set only keeps one copy of each artist
   const years = [];
@@ -349,6 +479,8 @@ function calculateInsights(artworks) {
     if (Number.isFinite(art.startYear)) years.push(art.startYear);
   }
 
+  // "cond ? a : b" is a one-line if/else. "...years" spreads the array into separate numbers for Math.min.
+  // null means "we don't know" — better than pretending the answer is 0.
   const earliest = years.length ? Math.min(...years) : null;
   const latest = years.length ? Math.max(...years) : null;
 
@@ -364,6 +496,8 @@ function calculateInsights(artworks) {
   };
 }
 
+// Turns the numbers from calculateInsights into a readable sentence. Template strings use
+// backticks and ${...} to drop values into text: `Hello ${name}`.
 function describeInsights(ins) {
   if (ins.total === 0) return 'Add paintings to discover the story of your collection.';
 
@@ -394,7 +528,109 @@ function describeInsights(ins) {
 }
 
 
+/* ---------- 7b. Curatorial Reflection: a written thread through the exhibition ---------- */
+
+// No AI and no network: the museum's own subject tags for each painting are matched to a handful of
+// human themes, and the most shared theme is turned into a short written reflection.
+// Each theme below has a "pattern" — a regular expression (regex), a mini search language for text.
+// /\b(tree|water)/ means "a word starting with tree or water". Don't worry about memorising regex;
+// just know each pattern lists the words that put a painting into that theme.
+// "pattern" is matched against each tag; \b means "start of a word", so "season" never matches "son".
+const REFLECTION_THEMES = [
+  { key: 'nature', short: 'nature and time',
+    pattern: /\b(landscape|tree|water|weather|season|cloud|flower|sky|sea|seas|ocean|mountain|river|lake|garden|nature|foliage|plant|winter|autumn|summer|snow|storm|rain|hill|wheat|forest|countryside|rural|bird|animal|wilderness|waterfall|sun|moon)/,
+    name: 'the natural world and the passing of time',
+    feeling: 'a longing for stillness, and the quiet awareness that light, seasons and people are always changing' },
+  { key: 'people', short: 'the human face',
+    pattern: /\b(portrait|self-portrait|people|woman|women|man|men|figure|girl|boy|nobility|royal|model|actors?|beard|hairstyle)/,
+    name: 'the human face and the question of who we are',
+    feeling: 'the wish to be truly seen, and the effort it takes to see someone else' },
+  { key: 'home', short: 'closeness and home',
+    pattern: /\b(mother|famil|child|couple|love|sister|son|sons|daughter|domestic|interior|bedroom|sleep|marriage|wedding|baby|babies|holy family|everyday life)/,
+    name: 'closeness, family and the rooms we live in',
+    feeling: 'tenderness, and the ache of caring for people we cannot always hold on to' },
+  { key: 'faith', short: 'faith and devotion',
+    pattern: /\b(religio|christian|saint|angel|jesus|virgin|madonna|biblical|bible|worship|prayer|praying|spiritual|holy|crucifix|nativity|divine|heaven|altar|shrine|church|devotion|resurrection|annunciation)/,
+    name: 'faith, devotion and the search for meaning',
+    feeling: 'the need for something larger than ourselves, and the comfort and doubt that come with it' },
+  { key: 'conflict', short: 'struggle and mortality',
+    pattern: /\b(death|violence|war|weapon|battle|blood|skull|sword|beheading|decapitation|execution|conflict|soldier|gun|armor|danger|cannon|slavery|spear)/,
+    name: 'struggle, danger and mortality',
+    feeling: 'fear, grief and courage, the feelings that are hardest to say aloud' },
+  { key: 'everyday', short: 'everyday life',
+    pattern: /\b(leisure|urban|city|cityscape|street|dining|drinking|food|dance|dancer|nightlife|performance|performer|entertainment|circus|train|travel|work|farm|farming|fishing|town|bar)/,
+    name: 'everyday life, leisure and the places we gather',
+    feeling: 'the small pleasures and quiet loneliness of ordinary days, which usually pass unnoticed' },
+  { key: 'myth', short: 'myth and imagination',
+    pattern: /\b(mytholog|myth|god|goddess|deity|deities|monster|dragon|fantas|mysteries|mermaid|merman|cupid|venus|zeus|neptune|heracles|nymph|dream|symbol)/,
+    name: 'myth, fantasy and the imagination',
+    feeling: 'the urge to turn what we cannot explain into a story' },
+  { key: 'form', short: 'color and form',
+    pattern: /\b(geometric|grid|square|circle|triangle|stripe|gestural|abstract|decorative|color|colour)/,
+    name: 'color, shape and pure form',
+    feeling: 'emotion that has no object, a mood you can feel long before you can name it' }
+];
+
+// Tags that describe the museum's records, not the picture.
+const IGNORED_SUBJECTS = /(world's fair|century of progress|collection|chicago|^painting$|^portraits?$|^people$)/;
+
+function subjectsOf(art) { return Array.isArray(art.subjects) ? art.subjects : []; }
+
+// Pure function: selected paintings in, a themed text and the evidence for it out.
+function buildReflection(artworks) {
+  const n = artworks.length;
+  if (n < 2) return { text: 'Add at least two paintings and ATELIER will look for the thread that connects them.', shared: [] };
+
+  // How many paintings touch each theme (a painting counts once per theme).
+  const counts = REFLECTION_THEMES.map((theme) => ({
+    theme,
+    count: artworks.filter((art) => subjectsOf(art).some((tag) => theme.pattern.test(tag))).length
+  })).sort((a, b) => (b.count - (b.theme.key === 'people' ? 0.5 : 0)) - (a.count - (a.theme.key === 'people' ? 0.5 : 0)));
+  // (the generic "people" theme loses ties, so a more specific shared idea such as faith comes first)
+
+  // Subject tags that two or more paintings have in common: the visible evidence.
+  const tagCounts = new Map();
+  artworks.forEach((art) => new Set(subjectsOf(art)).forEach((tag) => {
+    if (!IGNORED_SUBJECTS.test(tag)) tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+  }));
+  const shared = [...tagCounts].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([tag]) => tag);
+
+  const top = counts[0];
+  const second = counts[1];
+  const years = artworks.map((a) => a.startYear).filter(Number.isFinite);
+  const span = years.length >= 2 ? Math.max(...years) - Math.min(...years) : null;
+
+  if (top.count < 2) {
+    return {
+      text: `Your ${n} paintings don't share one obvious subject, and that can make the most interesting exhibition. The thread between them is whatever you felt when you chose each one. Try giving your exhibition a title that names it.`,
+      shared
+    };
+  }
+
+  const sentences = [
+    top.count >= Math.ceil(n * 0.6)
+      ? `Across your ${n} paintings, one idea keeps returning: ${top.theme.name}.`
+      : `Across your ${n} paintings, the strongest thread is ${top.theme.name}.`,
+    `It speaks to ${top.theme.feeling}.`
+  ];
+  if (second.count >= 2) {
+    sentences.push(`Alongside it runs a quieter thread: ${second.theme.short}.`);
+  }
+  if (span !== null && span >= 100) {
+    sentences.push(`Their dates stretch across about ${span} years, which suggests these feelings were as familiar to people then as they are to us now.`);
+  } else if (span !== null && span <= 30) {
+    sentences.push('Made within a few decades of each other, they read like a conversation between neighbors.');
+  }
+  sentences.push('What would you call it? The title you give this exhibition is the last word.');
+  return { text: sentences.join(' '), shared };
+}
+
+
 /* ---------- 8. Saving and loading ---------- */
+// localStorage is a small storage box built into the browser. It keeps text (strings) even after
+// the tab is closed. We can only store text, so we convert our object with JSON.stringify()
+// when saving and back with JSON.parse() when loading.
+// Never trust stored data: the user (or another program) could have edited it, so we VALIDATE it.
 
 function createEmptyExhibition() {
   return { version: 2, title: '', theme: { type: 'none', value: '' }, atmosphere: 'white-cube', artworks: [] };
@@ -418,7 +654,9 @@ function validateArtwork(a) {
   if (a.startYear !== null && !Number.isFinite(a.startYear)) return null;
   return {
     id: a.id, title, artist, artistKey: artist.trim().toLowerCase(), dateLabel,
-    startYear: a.startYear, imageId, imageUrl: a.imageUrl, altText, sourceUrl: a.sourceUrl
+    startYear: a.startYear,
+    subjects: Array.isArray(a.subjects) ? cleanSubjects(a.subjects) : null,   // null = saved before subjects existed; filled in at start-up
+    imageId, imageUrl: a.imageUrl, altText, sourceUrl: a.sourceUrl
   };
 }
 
@@ -448,6 +686,8 @@ function validateExhibition(data) {
   return { version: 2, title, theme: cleanTheme, atmosphere: data.atmosphere, artworks };
 }
 
+// Runs once at start-up. Three outcomes: nothing saved yet -> empty exhibition;
+// saved and valid -> use it; saved but broken -> start fresh and tell the user.
 function loadExhibition() {
   let raw = null;
   try {
@@ -468,6 +708,7 @@ function loadExhibition() {
   return valid;
 }
 
+// Called after EVERY change. Saving can fail (private browsing, full storage), so it's in try/catch.
 function saveExhibition() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(exhibition));
@@ -480,6 +721,9 @@ function saveExhibition() {
 
 
 /* ---------- 9. Changing the exhibition ---------- */
+// Every change follows the same recipe: 1) change the data  2) save  3) redraw  4) announce.
+// The ORDER of the exhibition.artworks array decides which wall slot a painting gets,
+// so "moving" a painting is really just swapping two items in the array.
 
 function addArtwork(art) {
   if (isSelected(art.id)) return;                       // no duplicates
@@ -495,6 +739,7 @@ function addArtwork(art) {
 function removeArtwork(id) {
   const index = exhibition.artworks.findIndex((a) => a.id === id);
   if (index === -1) return;
+  // splice(index, 1) deletes 1 item at that position and returns it (in an array, so we unpack it with [removed]).
   const [removed] = exhibition.artworks.splice(index, 1);   // later paintings close the gap
   saveExhibition();
   renderAll();
@@ -526,6 +771,8 @@ function setWall(wall) {
 
 
 /* ---------- 10. Drawing the page ---------- */
+// "Render" functions read the data and update what's on screen. They never change the data.
+// That keeps things predictable: data in -> page out. renderAll() simply runs every one of them.
 
 function renderAll() {
   renderCounter();
@@ -547,6 +794,8 @@ function renderCounter() {
   els.counterNum.textContent = n;
 }
 
+// The 3D room is turned with CSS, not JavaScript. We only set an attribute: data-wall="left".
+// styles.css has a rule for [data-wall="left"] that rotates the room. JS decides WHAT, CSS decides HOW.
 function renderWall() {
   els.stage.dataset.wall = ui.wall;
   els.wallButtons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.wall === ui.wall)));
@@ -576,6 +825,9 @@ function renderGallery() {
   });
 }
 
+// .map() turns every painting in the array into a list item (<li>), and replaceChildren()
+// swaps the old list for the new one. Each button carries data-action and data-id attributes
+// so ONE click handler (in bindEvents) can tell which button was pressed and for which painting.
 function renderSelectedList() {
   const list = exhibition.artworks;
   els.selectedEmpty.hidden = list.length > 0;
@@ -607,6 +859,11 @@ function renderInsights() {
     stat('Latest year', ins.latest === null ? 'Unknown' : String(ins.latest)),
     stat('Years spanned', ins.span === null ? 'Unknown' : String(ins.span))
   );
+
+  const reflection = buildReflection(exhibition.artworks);
+  els.reflection.textContent = reflection.text;
+  els.reflectionShared.hidden = reflection.shared.length === 0;
+  els.reflectionShared.textContent = reflection.shared.length ? `Shared subjects: ${reflection.shared.join(', ')}` : '';
 }
 
 function renderFinish() {
@@ -644,6 +901,7 @@ function renderHeadings() {
   els.galleryTheme.textContent = theme ? `Theme: ${theme}` : '';
 }
 
+// Shows a warning bar if saving doesn't work, or if saved data was unreadable.
 function renderNotices() {
   const text = !ui.storageOk ? 'Changes cannot be saved in this browser.' : ui.recoveryNotice;
   els.storageNotice.hidden = !text;
@@ -684,6 +942,8 @@ function syncControlsFromExhibition() {
 
 
 /* ---------- 11. Discover: search, categories, states ---------- */
+// The Discover panel is always in ONE of four states: loading, results, empty, or error.
+// Showing the right state for each situation is what makes an app feel solid.
 
 function describeRequest(request) {
   if (request.kind === 'featured') return 'Featured paintings';
@@ -697,6 +957,7 @@ function markActiveChip(request) {
 }
 
 // Checks the search box before any request is made. Returns the clean text, or null if invalid.
+// Validate BEFORE calling the API: empty or very long searches show a message and send no request.
 function validateQuery(raw) {
   const text = raw.trim();
   let message = '';
@@ -781,8 +1042,17 @@ function renderArtworkCards() {
 }
 
 // Runs one Featured / category / search request and draws the right state.
+// THE FULL API FLOW, step by step:
+//   1. Remember the request, cancel any older one still in flight, show the loading skeletons.
+//   2. buildDiscoverUrl() makes the address; fetchMuseumData() fetches and checks it.
+//   3. normalizeArtwork() cleans each result; .filter(Boolean) drops the nulls (skipped ones).
+//   4. Results found -> show cards. None -> maybe explain copyright. Error -> show Retry.
 async function loadDiscover(request) {
   ui.lastRequest = request;
+  // RACE CONDITION guard: if you click "Nature" then "Portraits" quickly, the Nature answer might
+  // arrive LAST and wrongly replace Portraits. Each request gets a number (seq); when an answer
+  // arrives we only use it if its number is still the newest. AbortController also cancels the old
+  // network request outright.
   ui.searchSeq += 1;
   const seq = ui.searchSeq;   // lets us ignore an older, slower request that finishes late
   if (ui.searchController) ui.searchController.abort();
@@ -799,6 +1069,7 @@ async function loadDiscover(request) {
     if (seq !== ui.searchSeq) return;
     if (!Array.isArray(json.data)) throw new Error('The museum API returned an unexpected response.');
 
+    // The museum tells us its current image-server address in json.config; use it if it looks safe (https).
     const iiif = json.config && typeof json.config.iiif_url === 'string' && json.config.iiif_url.startsWith('https://')
       ? json.config.iiif_url : IIIF_DEFAULT;
     ui.results = json.data
@@ -817,12 +1088,17 @@ async function loadDiscover(request) {
     ui.results = [];
     renderDiscoverState('error');   // the saved exhibition is untouched
   } finally {
+    // "finally" runs whether the request succeeded OR failed — a good place to re-enable the button.
     if (seq === ui.searchSeq) els.searchBtn.disabled = false;
   }
 }
 
 
 /* ---------- 12. Explore the Artwork ---------- */
+// The details dialog opens instantly with what we already know (title, artist, image), then makes
+// a SECOND API call for the extra story and display facts. These are never saved: they are fetched
+// fresh each time, so saved data stays small and the museum's wording is always current.
+// <dialog>.showModal() is a built-in browser feature: it shows a pop-up, dims the page, and traps keyboard focus.
 
 function openArtworkDetails(art, opener) {
   ui.detailArt = art;
@@ -908,6 +1184,8 @@ function renderDetails(data) {
 
 
 /* ---------- 13. Dialogs, modes and event listeners ---------- */
+// The app has two "modes": "studio" (build the exhibition) and "gallery" (just view it).
+// setMode() writes data-mode="..." on <body>, and CSS shows/hides the right parts.
 
 function setMode(mode) {
   els.body.dataset.mode = mode;
@@ -926,6 +1204,7 @@ function openOpening() {
   els.openingTheme.textContent = theme ? `Theme: ${theme}` : '';
   els.openingCount.textContent = `${n} ${plural(n, 'painting')} on display`;
   els.openingInsights.textContent = describeInsights(ins);
+  els.openingReflection.textContent = buildReflection(exhibition.artworks).text;
   els.openingDialog.showModal();
 }
 
@@ -945,6 +1224,8 @@ function openDrawer() {
   els.drawer.showModal();
 }
 
+// "Binding events" = telling the browser "when THIS happens to THAT element, run THIS function".
+// element.addEventListener('click', function) is the pattern you'll see below again and again.
 function bindEvents() {
   // Closing any dialog: buttons marked data-close, or a click on the dark backdrop.
   document.querySelectorAll('dialog').forEach((dialog) => {
@@ -983,7 +1264,11 @@ function bindEvents() {
     loadDiscover(key === 'featured' ? { kind: 'featured' } : { kind: 'category', key });
   }));
 
-  // Buttons inside the results area
+  // Buttons inside the results area.
+  // EVENT DELEGATION: the cards are created and destroyed constantly, so instead of attaching a
+  // listener to every button, we attach ONE listener to the container. A click "bubbles up" to it,
+  // and event.target.closest(...) finds which button was actually clicked. The button's
+  // data-action says what to do (add / explore / retry...) and data-id says which painting.
   els.resultsRegion.addEventListener('click', (event) => {
     const btn = event.target.closest('button[data-action]');
     if (!btn) return;
@@ -1036,7 +1321,8 @@ function bindEvents() {
 
   els.wallButtons.forEach((btn) => btn.addEventListener('click', () => setWall(btn.dataset.wall)));
 
-  // Title, theme, atmosphere
+  // Title, theme, atmosphere.
+  // The 'input' event fires on every keystroke, so the title is saved and shown as the user types.
   els.titleInput.addEventListener('input', () => {
     exhibition.title = els.titleInput.value.slice(0, MAX_TITLE);
     saveExhibition();
@@ -1082,6 +1368,7 @@ function bindEvents() {
 
 
 /* ---------- 14. Start-up ---------- */
+// Everything above only DEFINES functions; nothing runs until init() is called at the very bottom.
 
 function buildRoomSlots() {
   WALLS.forEach((wall) => {
@@ -1094,6 +1381,29 @@ function buildRoomSlots() {
   });
 }
 
+// Paintings saved before subjects existed have subjects === null. Ask the museum once for just those fields,
+// save them, and redraw. If it fails, nothing breaks: the reflection simply has less to work with.
+async function fillMissingSubjects() {
+  const missing = exhibition.artworks.filter((a) => a.subjects === null);
+  if (!missing.length) return;
+  try {
+    const url = `${API_BASE}/artworks?ids=${missing.map((a) => a.id).join(',')}&fields=id,subject_titles`;
+    const json = await fetchMuseumData(url);
+    if (!Array.isArray(json.data)) return;
+    missing.forEach((art) => {
+      const found = json.data.find((d) => d && d.id === art.id);
+      const live = exhibition.artworks.find((a) => a.id === art.id);   // the visitor may have removed it meanwhile
+      if (live) live.subjects = found ? cleanSubjects(found.subject_titles) : [];
+    });
+    saveExhibition();
+    renderInsights();
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// The order matters: build the room -> load saved data -> fill the form -> attach listeners ->
+// draw everything -> start the first API request (Featured paintings) so the page isn't empty.
 function init() {
   buildRoomSlots();
   exhibition = loadExhibition();
@@ -1103,6 +1413,7 @@ function init() {
   setMode('studio');
   renderAll();
   loadDiscover({ kind: 'featured' });   // the page is useful right away
+  fillMissingSubjects();
 }
 
 init();
