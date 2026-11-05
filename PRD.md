@@ -72,7 +72,7 @@ When time runs short, cut from the bottom. Never cut a higher tier to finish a l
 ## 4. The journey, step by step
 
 1. **Arrive and explore.** Opening ATELIER takes the visitor straight to the Studio. They see a beautiful empty gallery and a Discover section with artwork suggestions ready to browse. No sign-in required.
-2. **Search or browse.** They search for “Monet,” or choose Featured, Nature, Portraits, or City Life. The page fetches real artwork metadata and displays image cards.
+2. **Search or browse.** They search for “Monet,” or choose Featured, Nature, Portraits, City Life, or Abstract & Contemporary. The page fetches real artwork metadata and displays image cards.
 3. **Choose a favorite.** Clicking **Add to Exhibition** adds the selected work to the collection. The counter updates from `0/6` to `1/6`, and the painting visibly appears on its assigned wall without a page refresh.
 4. **Learn about the art.** Clicking **My Collection (1/6)** at the top right opens their saved list. Choosing **Explore the Artwork** reveals the painting's image, artist, date, story, and reliable museum/display details. The same information can be opened by clicking the painting in the gallery.
 5. **Keep curating.** They select up to six artworks, change their order, name the exhibition, optionally add a theme, and choose a gallery atmosphere.
@@ -92,7 +92,7 @@ The signature loop is **discover → add → see it appear → learn its story �
 
 **Discover panel:**
 - A labeled search field with placeholder `Search an artist, artwork, or subject`, a **Search** button, and Enter-key submission.
-- Category chips/buttons: **Featured**, **Nature**, **Portraits**, **City Life**. These issue different museum searches; do not make decorative filter buttons.
+- Category chips/buttons: **Featured**, **Nature**, **Portraits**, **City Life**, **Abstract & Contemporary**. These issue different museum searches; do not make decorative filter buttons.
 - A clear results/status area for the five required UI states.
 - Artwork cards: accurate image, painting title, artist, optional date, **Add to Exhibition**, and **Explore** (view details without adding).
 - Added artworks show **In your exhibition** instead of an active duplicate Add button.
@@ -199,6 +199,14 @@ Use **only the selected painting records** to calculate, update immediately on A
 
 `calculateInsights()` must be a pure function (selected array in, result object out, no DOM access) so it can be demonstrated and explained on its own.
 
+### 7.1 Curatorial Reflection (written thread)
+
+Below the Insights numbers, the Studio shows a short **Curatorial Reflection**: a few sentences naming the idea or feeling that connects the selected paintings, written for visitors who may not have words for what they feel in front of art. It is **not AI-generated and uses no extra service**: `buildReflection()` is a pure function that matches the museum's own `subject_titles` tags (requested in the existing `fields=` list, along with `style_title`) to a fixed set of human themes (nature and time, the human face, closeness and home, faith, struggle and mortality, everyday life, myth and imagination, color and form). The theme shared by the most paintings leads the text; a second shared theme and the year span can add a sentence.
+- Fewer than two paintings: `Add at least two paintings and ATELIER will look for the thread that connects them.`
+- No theme shared by at least two paintings: an honest message that the thread is the visitor's own choice, with a nudge to title the exhibition.
+- Shown under the stats with a `Shared subjects:` evidence line and the note that it is not AI-generated, and repeated in the Finish Curating overlay.
+- Paintings saved before subjects existed are filled in once at start-up with one `/artworks?ids=…&fields=id,subject_titles` request; if it fails, the reflection just has less to work with.
+
 ## 8. Museum API, live data, and network rules
 
 **API name:** Art Institute of Chicago Public API
@@ -226,7 +234,7 @@ Use **only the selected painting records** to calculate, update immediately on A
 ### Discover requests
 
 - On Studio load, automatically fetch one **Featured** artwork set so the page is useful immediately, even before a search. **Featured** uses the museum's own highlighted set: the same filters as below plus `query[bool][filter][2][term][is_boosted]=true` and **no search text** (checked 2026-11-04: 120 public-domain painting highlights, e.g. Van Gogh's *The Bedroom*, Seurat's *La Grande Jatte*). Do not ship hardcoded artwork data masquerading as a live response.
-- The other category buttons each send a different text query: Nature=`landscape`, Portraits=`portrait`, City Life=`city`. These are search hints, not exact art-historical classifications. Featured has its own source, so it never duplicates a category.
+- The other category buttons each send a different text query: Nature=`landscape`, Portraits=`portrait`, City Life=`city`. Abstract & Contemporary instead filters on the museum's own `classification_titles` value `modern and contemporary art` and excludes the Impressionism and Post-Impressionism styles. These are search hints, not exact art-historical classifications. Featured has its own source, so it never duplicates a category.
 - Explicit Search button/Enter sends a trimmed, URL-encoded search string. Don't send network requests on every keystroke. Empty/whitespace-only queries are invalid and must be refused locally.
 - **Filter on the server, not just the client, and put the search text INSIDE the `query` object.** The search endpoint accepts Elasticsearch-style queries. **Do not use the `q=` parameter together with `query[...]` filters: it was tested on 2026-11-04 and the search text is ignored, so every search (even nonsense) returned all 1,965 paintings and the zero-results state could never appear.** Use this shape instead (checked: `monet` returns 39 paintings with Monet's own first, `van gogh` as a phrase returns 10, and nonsense returns 0):
   - filters: `query[bool][filter][0][term][is_public_domain]=true` and `query[bool][filter][1][term][artwork_type_title.keyword]=Painting`
@@ -234,7 +242,7 @@ Use **only the selected painting records** to calculate, update immediately on A
   - for every query (one word or several), also set `query[bool][must][0][multi_match][type]=cross_fields` and `query[bool][must][0][multi_match][operator]=and`, so each word must match somewhere (checked: `monet water lilies` returns 3 Monet paintings; `van gogh` returns Van Gogh's paintings first, then a few that mention him; nonsense returns 0). Because description text is searched too, a search can also list paintings by other artists whose description mentions the search words; this is intended for "artist, artwork, or subject" search, and the artist's own paintings rank first.
 
   Build the URL with `URLSearchParams` so brackets and user text are encoded. Still re-check `is_public_domain`, `artwork_type_title`, and `image_id` on the client before rendering, and drop anything ineligible.
-- Request only the fields needed via `fields=`, and request `limit=16` results. **Display 8 to 12 paintings**: after the client-side eligibility re-check, show the first 12 that pass, or all of them if fewer than 12 pass (including fewer than 8). **Do not request or store `thumbnail.lqip`** (a base64 blur placeholder that bloats responses and localStorage): ask for `fields=...,thumbnail.alt_text` (checked: the API returns only the alt text when asked this way) and keep only that.
+- Request only the fields needed via `fields=`, and request `limit=22` results. **Display 8 to 18 paintings**: after the client-side eligibility re-check, show the first 18 that pass, or all of them if fewer than 18 pass (including fewer than 8). **Do not request or store `thumbnail.lqip`** (a base64 blur placeholder that bloats responses and localStorage): ask for `fields=...,thumbnail.alt_text` (checked: the API returns only the alt text when asked this way) and keep only that.
 - If fewer eligible results exist, show only those. The results grid always reflects the real API response.
 - Check the response's `data` shape (`Array.isArray`); keep the current saved collection untouched if search fails. Prevent old, slow searches from overwriting newer results using `AbortController` or request sequence IDs.
 - Keep requests modest and respect the API's documented usage limits. Public GETs need no secret key.

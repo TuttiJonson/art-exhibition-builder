@@ -8,7 +8,8 @@ Built for someone who loves art and wants to enjoy it without needing an art-his
 
 ## What you can do
 
-- **Discover:** browse Featured paintings (the museum's own highlights) or the Nature, Portraits and City Life categories, or search by artist, artwork or subject.
+- **Discover:** browse Featured paintings (the museum's own highlights) or the Nature, Portraits, City Life and Abstract & Contemporary categories, or search by artist, artwork or subject.
+- **Reflect:** a Curatorial Reflection reads the museum's subject tags for your paintings and writes a short text about the idea that connects them. It is template-written, not AI-generated.
 - **Curate:** add up to six paintings, reorder them with Move Earlier / Move Later, and remove any. Each painting lands on a fixed wall slot (two per wall).
 - **Personalize:** name the exhibition, pick an optional theme (or write your own, up to 80 characters), and choose White Cube, Warm Gallery or Dark Gallery.
 - **Explore the Artwork:** open any painting for the museum's description, medium, and where to find it. *Holding collection*, *current display status* and *place of origin* are kept separate, because a painting's origin is not where it hangs.
