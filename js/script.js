@@ -168,6 +168,7 @@ const els = {
   galleryTheme: $('gallery-theme'),
   storageNotice: $('storage-notice'),
   titleInput: $('title-input'),
+  titleError: $('title-error'),
   themeSelect: $('theme-select'),
   themeCustomWrap: $('theme-custom-wrap'),
   themeCustom: $('theme-custom'),
@@ -865,6 +866,11 @@ function renderInsights() {
   els.reflectionShared.textContent = reflection.shared.length ? `Shared subjects: ${reflection.shared.join(', ')}` : '';
 }
 
+function clearTitleError() {
+  els.titleError.textContent = '';
+  els.titleInput.removeAttribute('aria-invalid');
+}
+
 function renderFinish() {
   const none = exhibition.artworks.length === 0;
   els.finishBtn.disabled = none;
@@ -1323,6 +1329,7 @@ function bindEvents() {
   // The 'input' event fires on every keystroke, so the title is saved and shown as the user types.
   els.titleInput.addEventListener('input', () => {
     exhibition.title = els.titleInput.value.slice(0, MAX_TITLE);
+    if (exhibition.title.trim()) clearTitleError();
     saveExhibition();
     renderHeadings();
   });
@@ -1351,7 +1358,17 @@ function bindEvents() {
   }));
 
   // Finish Curating
-  els.finishBtn.addEventListener('click', () => { if (exhibition.artworks.length) openOpening(); });
+  els.finishBtn.addEventListener('click', () => {
+    if (!exhibition.artworks.length) return;
+    // An exhibition must have a name before it can be finished.
+    if (!exhibition.title.trim()) {
+      els.titleError.textContent = 'Please name your exhibition before finishing.';
+      els.titleInput.setAttribute('aria-invalid', 'true');
+      els.titleInput.focus();
+      return;
+    }
+    openOpening();
+  });
   els.enterBtn.addEventListener('click', () => {
     els.openingDialog.close();
     setMode('gallery');

@@ -108,7 +108,8 @@
       <div class="editor editor-only">
         <div class="field">
           <label for="title-input">Exhibition title</label>
-          <input id="title-input" type="text" maxlength="80" placeholder="Untitled Exhibition" autocomplete="off">
+          <input id="title-input" type="text" maxlength="80" placeholder="Untitled Exhibition" autocomplete="off" aria-describedby="title-error">
+          <p id="title-error" class="field-error" role="alert"></p>
         </div>
 
         <div class="field">
