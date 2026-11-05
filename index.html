@@ -46,6 +46,7 @@
         <button type="button" class="chip" data-category="nature" aria-pressed="false">Nature</button>
         <button type="button" class="chip" data-category="portraits" aria-pressed="false">Portraits</button>
         <button type="button" class="chip" data-category="city" aria-pressed="false">City Life</button>
+        <button type="button" class="chip" data-category="abstract" aria-pressed="false">Abstract &amp; Contemporary</button>
       </div>
 
       <h3 id="results-title" class="results-title">Featured paintings</h3>
@@ -147,6 +148,10 @@
           <div aria-live="polite">
             <p id="insights-summary" class="insights-summary"></p>
             <dl id="insights-stats" class="insights-stats"></dl>
+            <h4 class="reflection-title">Curatorial Reflection</h4>
+            <p id="insights-reflection" class="insights-reflection"></p>
+            <p id="insights-shared" class="hint" hidden></p>
+            <p class="hint">Written by ATELIER from the museum's subject tags for your paintings. It is not AI-generated.</p>
           </div>
         </section>
 
@@ -210,6 +215,7 @@
       <p id="opening-theme" class="opening-theme" hidden></p>
       <p id="opening-count" class="opening-count"></p>
       <p id="opening-insights" class="opening-insights"></p>
+      <p id="opening-reflection" class="opening-insights opening-reflection"></p>
       <div class="dialog-actions">
         <button type="button" class="btn btn-primary btn-large" id="enter-btn">Enter My Gallery</button>
         <button type="button" class="btn btn-secondary btn-large" data-close>Keep Editing</button>
