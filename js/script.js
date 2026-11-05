@@ -251,11 +251,12 @@ async function fetchMuseumData(url, { signal } = {}) {
 
 // Builds the search address. The museum's search text goes INSIDE the query (not "q="),
 // because "q=" is ignored once filters are added.
-function buildDiscoverUrl(request) {
+function buildDiscoverUrl(request, { publicDomain = true } = {}) {
   const params = new URLSearchParams();
-  params.set('limit', String(REQUEST_LIMIT));
+  params.set('limit', String(publicDomain ? REQUEST_LIMIT : 40));
   params.set('fields', SEARCH_FIELDS);
-  params.set('query[bool][filter][0][term][is_public_domain]', 'true');
+  // publicDomain:false is used only to find out WHY a search came back empty (see findCopyrightedArtist).
+  params.set('query[bool][filter][0][term][is_public_domain]', String(publicDomain));
   params.set('query[bool][filter][1][term][artwork_type_title.keyword]', 'Painting');
 
   if (request.kind === 'featured') {
@@ -271,6 +272,34 @@ function buildDiscoverUrl(request) {
     });
   }
   return `${API_BASE}/artworks/search?${params}`;
+}
+
+// Lowercase, no accents, so "de Kooning" matches "De Kooning" and "Miró" matches "miro".
+function foldText(text) {
+  return String(text).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+// Called only when a search found no public-domain paintings. Asks the museum the same question
+// for COPYRIGHTED paintings and returns the artist's name if the search words match an artist
+// (every word must appear in the artist's name, so a painting that merely mentions the word does not count).
+// Never throws: if this extra check fails, the normal "No paintings found" message is shown.
+async function findCopyrightedArtist(request, signal) {
+  if (request.kind !== 'search') return '';
+  try {
+    const json = await fetchMuseumData(buildDiscoverUrl(request, { publicDomain: false }), { signal });
+    if (!Array.isArray(json.data)) return '';
+    const words = foldText(request.text).split(/[^a-z0-9]+/).filter(Boolean);
+    if (!words.length) return '';
+    for (const raw of json.data) {
+      if (!raw || raw.is_public_domain === true || raw.artwork_type_title !== 'Painting') continue;
+      if (typeof raw.artist_title !== 'string' || !raw.artist_title.trim()) continue;
+      const name = foldText(raw.artist_title);
+      if (words.every((w) => name.includes(w))) return raw.artist_title.trim();
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+  }
+  return '';
 }
 
 function buildDetailUrl(id) {
@@ -695,7 +724,7 @@ function searchArtworks() {
   loadDiscover({ kind: 'search', text });
 }
 
-function renderDiscoverState(kind) {
+function renderDiscoverState(kind, copyrightArtist = '') {
   const region = els.resultsRegion;
   region.setAttribute('aria-busy', String(kind === 'loading'));
   els.fullHint.hidden = !isFull();
@@ -722,8 +751,11 @@ function renderDiscoverState(kind) {
 
   if (kind === 'empty') {
     els.discoverStatus.textContent = '';
+    const message = copyrightArtist
+      ? `${copyrightArtist} is in the Art Institute of Chicago's collection, but their work is still under copyright, so it can't be displayed here. ATELIER only shows public-domain paintings. Try an artist whose work is in the public domain, such as Claude Monet or Vincent van Gogh.`
+      : 'No paintings found. Try a different artist or keyword.';
     region.replaceChildren(el('div', { class: 'state state-empty' },
-      el('p', { text: 'No paintings found. Try a different artist or keyword.' }),
+      el('p', { text: message }),
       el('button', { type: 'button', class: 'btn btn-secondary', 'data-action': 'clear-search', text: 'Clear Search' })));
     return;
   }
@@ -774,7 +806,11 @@ async function loadDiscover(request) {
       .filter(Boolean)
       .slice(0, DISPLAY_LIMIT);
 
-    renderDiscoverState(ui.results.length ? 'results' : 'empty');
+    if (ui.results.length) { renderDiscoverState('results'); return; }
+
+    const copyrightArtist = await findCopyrightedArtist(request, controller.signal);
+    if (seq !== ui.searchSeq) return;
+    renderDiscoverState('empty', copyrightArtist);
   } catch (error) {
     if (error.name === 'AbortError' || seq !== ui.searchSeq) return;
     console.error(error);
