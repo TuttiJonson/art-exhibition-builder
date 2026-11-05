@@ -1,6 +1,28 @@
 /* ATELIER — styles. Follows DESIGN.md (tokens, layout, states, accessibility). */
 
+/* ==========================================================================
+   HOW TO READ THIS FILE (for beginners)
+
+   CSS is a list of RULES. Each rule has a "selector" (which elements) and "declarations" (how they look):
+
+       .btn { padding: 8px; }      <- ".btn" = every element with class="btn"
+       #stage { ... }              <- "#" = the element with id="stage"
+       button { ... }              <- no symbol = every <button>
+       .a .b { ... }               <- ".b" only when INSIDE ".a"
+       [hidden] { ... }            <- elements that have the "hidden" attribute
+       .chip:hover { ... }         <- ":" = a state, here while the mouse is over it
+
+   The file goes top to bottom: shared basics first (tokens, base, buttons), then each part of
+   the page (header, search, 3D gallery, editor, dialogs), then special cases (gallery mode, phones).
+
+   JavaScript never sets colors or sizes directly. It only flips attributes like data-wall="left" or
+   data-mode="gallery", and the rules below react to them, e.g. [data-wall="left"] { ...rotate... }.
+   ========================================================================== */
+
 /* ---------- 1. Design tokens (DESIGN.md §3) ---------- */
+/* "Tokens" are named values stored as CSS variables, defined once on :root (the whole page).
+   Use them anywhere with var(--name). To re-theme the app, change a value here and it updates everywhere.
+   --space-N is a spacing scale so gaps and padding stay consistent. */
 :root {
   --color-bg: #F7F6F2;
   --color-surface: #FFFFFF;
@@ -26,7 +48,10 @@
 }
 
 /* ---------- 2. Base ---------- */
+/* Defaults for the whole page. */
+/* border-box: an element's width INCLUDES its padding and border, which makes sizing far easier to predict. */
 *, *::before, *::after { box-sizing: border-box; }
+/* The HTML "hidden" attribute (which our JS toggles) must always win, so !important is used here on purpose. */
 [hidden] { display: none !important; }
 
 html { -webkit-text-size-adjust: 100%; }
@@ -44,12 +69,15 @@ a { color: var(--color-ink); text-underline-offset: 2px; }
 img { max-width: 100%; display: block; }
 button, input, select { font: inherit; color: inherit; }
 
+/* Accessibility: a clear blue ring shows which element the keyboard is on (appears for keyboard users, not mouse clicks). */
 :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 
+/* "Screen-reader only": visually hidden (1px, clipped) but still read aloud. Not display:none, which would hide it from screen readers too. */
 .sr-only {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+/* "Skip to content" link: parked off-screen (top: -60px) and slid into view when a keyboard user tabs onto it. */
 .skip-link {
   position: absolute; left: var(--space-2); top: -60px; z-index: 100;
   background: var(--color-ink); color: #fff; padding: var(--space-2) var(--space-4);
@@ -63,6 +91,8 @@ button, input, select { font: inherit; color: inherit; }
 .hint { font-size: 0.875rem; color: var(--color-muted); }
 
 /* ---------- 3. Buttons and form controls ---------- */
+/* .btn is the base look; .btn-primary / -secondary / -quiet / -small are add-on "modifier" classes
+   used together, e.g. class="btn btn-primary". min-height: 44px keeps buttons big enough to tap. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
   min-height: 44px; padding: 0 var(--space-4);
@@ -75,10 +105,13 @@ button, input, select { font: inherit; color: inherit; }
 .btn-quiet { border-color: var(--color-border); color: var(--color-muted); font-weight: 500; background: transparent; }
 .btn-small { min-height: 44px; padding: 0 var(--space-3); font-size: 0.9rem; }
 .btn-large { padding: 0 var(--space-6); }
+/* Greyed-out look for real disabled buttons AND ones marked aria-disabled (the "Add" buttons stay
+   focusable so a screen reader can still explain why they can't be used). */
 .btn:disabled, .btn[aria-disabled="true"] {
   opacity: 0.55; cursor: not-allowed;
 }
 .btn.is-added { background: var(--color-surface); color: var(--color-success); border-color: var(--color-success); opacity: 1; }
+/* Hover effect, but only on buttons that are NOT disabled (":not(...)" excludes things). */
 .btn:not(:disabled):not([aria-disabled="true"]):hover { filter: brightness(1.15); }
 .btn-secondary:not(:disabled):not([aria-disabled="true"]):hover,
 .btn-quiet:not(:disabled):hover { filter: none; background: #EFEDE8; }
@@ -95,12 +128,16 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .field-error { color: var(--color-error); font-size: 0.9rem; margin-top: var(--space-1); }
 .field-error:empty { display: none; }
 
+/* Chips = the category filter buttons. Flexbox ("display: flex") lays children out in a row;
+   flex-wrap lets them drop to a new line when there isn't room; gap spaces them out. */
 .chips, .wall-nav { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .chip {
   min-height: 44px; padding: 0 var(--space-4);
   background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 999px;
   cursor: pointer; font-weight: 500;
 }
+/* The active chip: JS sets aria-pressed="true" and this rule restyles it. The ✓ is added with ::before so it's
+   not only color that shows which one is selected (helps color-blind users). */
 .chip[aria-pressed="true"] { background: var(--color-ink); border-color: var(--color-ink); color: #fff; font-weight: 600; }
 .chip[aria-pressed="true"]::before { content: "✓ "; }
 
@@ -114,6 +151,9 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .subtitle { color: var(--color-muted); font-size: 0.875rem; }
 .header-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
+/* CSS Grid: ".studio" is the main area holding the Discover and Exhibition panels.
+   On phones it's ONE column (minmax(0, 1fr) = "take all the width, allowed to shrink").
+   max-width + margin: 0 auto centers it on very wide screens. */
 .studio { padding: var(--space-4); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); max-width: 1400px; margin: 0 auto; }
 .panel { min-width: 0; }
 .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
@@ -122,6 +162,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .site-footer { padding: var(--space-6) var(--space-4); color: var(--color-muted); font-size: 0.875rem; max-width: 1400px; margin: 0 auto; }
 .site-footer a { color: inherit; }
 
+/* Media query = "only apply these rules if the screen is at least 1000px wide".
+   On desktops the two panels sit side by side, 45% / 55% ("fr" = a share of the space). */
 @media (min-width: 1000px) {
   .studio { grid-template-columns: minmax(0, 45fr) minmax(0, 55fr); gap: var(--space-6); padding: var(--space-6); }
   .jump-link { display: none; }
@@ -139,6 +181,7 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .source-note { margin-top: var(--space-4); font-size: 0.8125rem; color: var(--color-muted); }
 .source-note a { color: inherit; }
 
+/* The grid of artwork cards: 2 equal columns (1 on phones, see section 10). */
 .card-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
 .card {
   background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);
@@ -146,6 +189,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 }
 /* A fixed-ratio box; the painting fills it with object-fit: contain so tall paintings never stretch the card. */
 .card-image { aspect-ratio: 4 / 3; background: #EFEDE8; position: relative; overflow: hidden; }
+/* The picture is placed absolutely inside the fixed-ratio box and scaled to fit ("contain" keeps the
+   whole painting visible without cropping or stretching). */
 .card-image img, .card-image .img-fallback {
   position: absolute; inset: var(--space-2);
   width: calc(100% - 2 * var(--space-2)); height: calc(100% - 2 * var(--space-2)); max-width: none;
@@ -162,7 +207,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   padding: var(--space-3); background: #E6E3DC; color: var(--color-muted); font-size: 0.8rem; border: 1px dashed var(--color-border);
 }
 
-/* State boxes (DESIGN.md §7) */
+/* State boxes (DESIGN.md §7): the look of the loading / empty / error messages JS puts in the results area.
+   The "skeleton" cards are grey placeholders with a moving highlight (@keyframes shimmer) while data loads. */
 .state {
   padding: var(--space-6); border-radius: var(--radius-md); background: var(--color-surface);
   border: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3);
@@ -185,6 +231,16 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .notice button { background: none; border: 0; text-decoration: underline; cursor: pointer; min-height: 44px; padding: 0 var(--space-2); }
 
 /* ---------- 6. Gallery room (DESIGN.md §5; units are cqw = 1% of the stage frame's width) ---------- */
+/* HOW THE 3D ROOM WORKS (the trickiest part of the file)
+   The room is built from flat rectangles (3 walls, a floor, a ceiling) placed in 3D space with CSS transforms:
+     - perspective (on .stage)        : gives depth, like a camera. Smaller number = stronger 3D.
+     - transform-style: preserve-3d   : lets children keep their 3D positions instead of flattening.
+     - translateZ(...)                : moves a surface toward / away from the viewer.
+     - rotateY(90deg) / rotateX(90deg): turns a surface so it becomes a side wall / the floor.
+   To "look at" another wall we don't move a camera, we ROTATE THE WHOLE ROOM (.room), and
+   "transition: transform 0.7s" animates the turn smoothly.
+   cqw is a "container query width" unit: 1cqw = 1% of the width of .stage-frame (container-type: inline-size).
+   Because everything is sized in cqw, the whole room scales perfectly with the screen. */
 .stage-wrap { position: relative; }
 .stage-frame {
   container-type: inline-size; position: relative;
@@ -197,6 +253,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   position: relative; aspect-ratio: 16 / 10; width: 100%;
   perspective: 110cqw; background: var(--room-wall);
 }
+/* Atmosphere: JS sets data-atmosphere on .stage, and these rules just swap the three color variables
+   defined above. Every wall, floor and ceiling reads those variables, so they all change together. */
 .stage[data-atmosphere="warm"] { --room-wall: #E8DCC9; --room-floor: #BFA88C; --room-glow: rgba(255, 214, 150, 0.30); }
 .stage[data-atmosphere="dark"] { --room-wall: #262626; --room-floor: #4A4541; --room-glow: rgba(255, 244, 220, 0.18); }
 
@@ -206,6 +264,7 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   transform: translateZ(20cqw) rotateY(0deg);
   transition: transform 0.7s ease;
 }
+/* Turning the room: JS sets data-wall="left" or "right" on .stage; these rules rotate the room -90° / +90°. */
 .stage[data-wall="left"] .room { transform: translateZ(20cqw) rotateY(-90deg); }
 .stage[data-wall="right"] .room { transform: translateZ(20cqw) rotateY(90deg); }
 
@@ -220,6 +279,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
     var(--room-wall);
   border-bottom: 1.4cqw solid rgba(0, 0, 0, 0.10);
 }
+/* Placing the walls: the front wall is pushed back; the left/right walls are first rotated 90° then pushed
+   out, so they form the sides of a box. The floor and ceiling are rotated flat on the X axis. */
 .wall-front { transform: translateZ(-42cqw); }
 .wall-left { transform: rotateY(90deg) translateZ(-42cqw); }
 .wall-right { transform: rotateY(-90deg) translateZ(-42cqw); }
@@ -242,6 +303,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .wall-slots { height: 100%; display: flex; align-items: center; justify-content: space-evenly; padding: 0 4cqw 1.4cqw; }
 .slot { flex: 0 0 auto; display: grid; place-items: center; width: 34cqw; height: 40cqw; }
 
+/* A painting on the wall: the <button> acts as the picture frame (dark border + drop shadow).
+   It's a real button so keyboard and screen-reader users can open "Explore" on it. */
 .painting {
   display: inline-grid; place-items: center; padding: 0; cursor: pointer;
   background: #fff; border: 0.7cqw solid #2b2622; border-radius: 0;
@@ -273,12 +336,16 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 h2[tabindex="-1"]:focus, h3[tabindex="-1"]:focus { outline: none; }
 
 /* ---------- 7. Editor ---------- */
+/* Title / theme / atmosphere controls, the selected-paintings list, and the Curatorial Insights box. */
 .atmosphere-options { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .swatch {
   display: inline-flex; align-items: center; gap: var(--space-2); margin: 0; font-weight: 500;
   min-height: 44px; padding: 0 var(--space-3) 0 var(--space-2);
   border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer;
 }
+/* Custom radio buttons: the real <input type="radio"> is made invisible but kept (so the keyboard and
+   screen readers still work), and the styled "pill" label is what you see. ":has(input:checked)" means
+   "style this label when the radio inside it is selected". */
 .swatch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .swatch:has(input:checked) { border-color: var(--color-ink); box-shadow: inset 0 0 0 1px var(--color-ink); font-weight: 600; }
 .swatch:has(input:checked) .swatch-name::before { content: "✓ "; }
@@ -304,9 +371,13 @@ h2[tabindex="-1"]:focus, h3[tabindex="-1"]:focus { outline: none; }
 
 .insights { margin-top: var(--space-6); padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
 .insights-summary { margin-top: var(--space-2); }
+/* auto-fit + minmax(110px, 1fr): "fit as many columns of at least 110px as will fit" — a responsive grid with no media query. */
 .insights-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--space-3); margin: var(--space-3) 0 0; }
 .insights-stats div { padding: var(--space-2) var(--space-3); background: var(--color-bg); border-radius: var(--radius-sm); }
 .insights-stats dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-muted); }
+.reflection-title { margin: var(--space-4) 0 var(--space-2); font-family: var(--font-heading); font-size: 1.05rem; }
+.insights-reflection { margin: 0 0 var(--space-2); line-height: 1.6; }
+.opening-reflection { font-style: italic; margin-top: var(--space-2); }
 .insights-stats dd { margin: 0; font-family: var(--font-heading); font-size: 1.35rem; }
 
 .finish { margin-top: var(--space-6); display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
@@ -314,6 +385,9 @@ h2[tabindex="-1"]:focus, h3[tabindex="-1"]:focus { outline: none; }
 #save-status:empty { display: none; }
 
 /* ---------- 8. Dialogs and drawer ---------- */
+/* These style the built-in <dialog> element. The browser already centers it and handles Esc / focus;
+   ::backdrop styles the dark overlay behind it. The "drawer" is the same dialog pinned to the right edge
+   (margin-left: auto pushes it right) at full height. */
 .dialog {
   border: 0; padding: 0; color: var(--color-ink); background: var(--color-surface);
   border-radius: var(--radius-md); width: min(92vw, 820px); max-height: 92vh; overflow: auto;
@@ -353,6 +427,8 @@ h2[tabindex="-1"]:focus, h3[tabindex="-1"]:focus { outline: none; }
 .dialog-confirm { width: min(92vw, 440px); }
 
 /* ---------- 9. Gallery mode: same stage, enlarged ---------- */
+/* When JS sets <body data-mode="gallery">, these rules hide the search/editor panels and let the room fill the page.
+   No JS is needed to hide things — the attribute on <body> is enough. */
 body[data-mode="gallery"] #discover,
 body[data-mode="gallery"] .editor-only,
 body[data-mode="gallery"] #exhibition > .notice[hidden] { display: none; }
@@ -362,6 +438,8 @@ body[data-mode="gallery"] .stage-frame { width: min(100%, calc((100vh - 340px) *
 body[data-mode="gallery"] .wall-nav { justify-content: center; }
 
 /* ---------- 10. Phone layout: below 600px the room becomes an accessible 2D wall list ---------- */
+/* On small screens a 3D room is too tiny to use, so the 3D is switched OFF: perspective and transforms are removed
+   and the three walls become three ordinary stacked boxes. This is "responsive design": same HTML, different layout. */
 @media (max-width: 599px) {
   .site-header { padding: var(--space-3); }
   .wordmark { font-size: 1.75rem; }
@@ -393,6 +471,8 @@ body[data-mode="gallery"] .wall-nav { justify-content: center; }
 }
 
 /* ---------- 11. Motion preferences ---------- */
+/* Some people get dizzy from animation and turn on "reduce motion" in their system settings.
+   This media query detects that and switches the room-turning, shimmer and hover-zoom animations off. */
 @media (prefers-reduced-motion: reduce) {
   .room { transition: none; }
   .skeleton .card-image, .skeleton .skeleton-line { animation: none; }
