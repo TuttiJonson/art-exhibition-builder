@@ -311,7 +311,9 @@ async function fetchMuseumData(url, { signal } = {}) {
   // the code jumps into "catch" instead of crashing. fetch() only fails like this when
   // there's no connection at all (offline, blocked, DNS problem).
   try {
-    response = await fetch(url, { signal });
+    // referrerPolicy 'no-referrer': the museum's API rejects (HTTP 403) requests that carry a
+    // Referer header from some websites (e.g. a deployed *.vercel.app site), so we don't send one.
+    response = await fetch(url, { signal, referrerPolicy: 'no-referrer' });
   } catch (error) {
     if (error.name === 'AbortError') throw error;   // a newer search replaced this one: not a visible error
     throw new Error('Could not reach the museum (network problem).');
