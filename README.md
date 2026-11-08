@@ -1,71 +1,34 @@
 # ATELIER — art exhibition builder
 
-ATELIER is a personal art-curation website. Discover real paintings from the Art Institute of Chicago, choose up to six favorites, hang them in a virtual gallery, read the story behind each one, and find out whether the museum currently lists it as on view.
+**Live site:** https://tuttijonson.github.io/art-exhibition-builder/
 
-**Live site:** https://tuttijonson.github.io/art-exhibition-builder/ (published with GitHub Pages; see "Publishing" below)
 
-Built for someone who loves art and wants to enjoy it without needing an art-history background: no sign-in, no setup, and your exhibition is remembered on the device you use.
+## What it does
 
-## What you can do
+ATELIER lets you discover real paintings, pick up to six favorites, and hang them in a virtual gallery. You can read the story behind each painting, see whether the museum currently has it on view, and get a short summary of your exhibition (number of artists, years spanned, and a written reflection).
 
-- **Discover:** browse Featured paintings (the museum's own highlights) or the Nature, Portraits, City Life and Abstract & Contemporary categories, or search by artist, artwork or subject.
-- **Reflect:** a Curatorial Reflection reads the museum's subject tags for your paintings and writes a short text about the idea that connects them. It is template-written, not AI-generated.
-- **Curate:** add up to six paintings, reorder them with Move Earlier / Move Later, and remove any. Each painting lands on a fixed wall slot (two per wall).
-- **Personalize:** name the exhibition, pick an optional theme (or write your own, up to 80 characters), and choose White Cube, Warm Gallery or Dark Gallery.
-- **Explore the Artwork:** open any painting for the museum's description, medium, and where to find it. *Holding collection*, *current display status* and *place of origin* are kept separate, because a painting's origin is not where it hangs.
-- **Curatorial Insights:** the page calculates the number of distinct artists and the span of years between the earliest and latest known creation dates in your selection, and updates it on every change.
-- **Finish Curating:** an opening overlay, then a larger gallery you can walk through wall by wall (Front, Left, Right). You can always go back and edit.
+## API
 
-## How it meets the project requirements
+[Art Institute of Chicago API](https://api.artic.edu/docs/) — free and public, no key needed. Only public-domain paintings with images are shown.
 
-| Requirement | Where |
-|---|---|
-| Plain HTML, CSS and JavaScript only; no frameworks, packages, build step, CDN scripts/styles/fonts | `index.html`, `css/styles.css`, `js/script.js` |
-| Real data with `fetch()` and `await` | `fetchMuseumData()` in `js/script.js` (every request uses it) |
-| `try/catch`, `response.ok` checked before reading JSON, bad payloads detected | `fetchMuseumData()`: network failure, HTTP errors (404/429/500), unreadable JSON and unexpected response bodies each get their own message |
-| User choices change what is requested or shown | search, categories, add/remove/reorder, theme, atmosphere, wall view |
-| Calculated output from API data | `calculateInsights()` and `describeInsights()`: distinct artists (a `Set`) and year span (min/max of `date_start`) |
-| Empty, Loading, Error, Invalid Input, In Use states | Discover results area, details dialog, search field, gallery (see `PRD.md` section 9 and `DESIGN.md` section 7) |
-| Accessible and works at about 375px wide | semantic HTML, native `<dialog>`, keyboard focus rings, 2D wall layout below 600px |
-| No API key or secret | none exists; the museum's public API needs none |
+## How to use it
 
-## The museum API
+1. Browse the Featured paintings or a category, or search by artist, artwork or subject.
+2. Press **Explore** to read a painting's story and where it hangs.
+3. Press **Add to Exhibition** (up to six). The Curatorial Insights update as you add or remove.
+4. Turn the room with the Front / Left / Right buttons, and reorder with **Move Earlier / Move Later**.
+5. Name your exhibition, then optionally pick a theme and gallery atmosphere.
+6. Press **Finish Curating**, then **Enter the Gallery**.
 
-- Base URL: `https://api.artic.edu/api/v1` (documentation: https://api.artic.edu/docs/)
-- Search: `/artworks/search` with a query that keeps only public-domain paintings that have an image. Featured uses the museum's highlighted set. A search never fires on every keystroke, and an older, slower search cannot overwrite a newer one.
-- Details: `/artworks/{id}` is fetched when you open **Explore the Artwork**, so display status is never stored or treated as permanent.
-- **Images:** painting images are loaded from the museum's own image service (`www.artic.edu/iiif/...`) as part of the artwork data the API returns. They are artwork content, not app assets. ATELIER loads no other external files.
-- **Attribution:** artwork information and descriptions come from the Art Institute of Chicago. Museum displays change, so check the official website before visiting.
+Your exhibition is saved automatically in your browser.
 
-## Saved data
 
-One exhibition is saved automatically in this browser's `localStorage` (key `atelier-exhibition-v2`). There are no accounts, no server, and no sharing. If saved data is damaged it is ignored and a short notice appears; if the browser blocks storage, ATELIER keeps working for the session and says changes cannot be saved.
+## Where the agent's work differed from what I expected
 
-## Running it locally
+**Commit:** [c8ba20a](https://github.com/TuttiJonson/art-exhibition-builder/commit/c8ba20a5603c5ca20dd3e011e9b910c2436e74f2)
 
-There is nothing to install. Either open `index.html` in a browser, or serve the folder so paths behave as they do online:
+**What the agent built:** Discover and Your Exhibition sat on one long page, with "Skip to your exhibition" and "Back to Discover" links to jump between them. On a phone, tapping "Skip to your exhibition" scrolled down the page, and getting back meant scrolling up again. The exhibition showed up in several places, so it was unclear where it actually was.
 
-```sh
-python3 -m http.server 8000
-# then visit http://localhost:8000/
-```
+**What I expected:** A better UI would have the exhibition in its own tab. Users were confused about where to click and where the exhibition was, because it kept moving down and up the page. The exhibition should be one place, not several, so a user can focus on the exhibition first and on the artworks afterward.
 
-## Publishing
-
-In the GitHub repository, open **Settings → Pages**, choose **Deploy from a branch**, select `main` and the `/ (root)` folder, and save. All file paths in the project are relative, so the site works under `/art-exhibition-builder/`.
-
-## Project files
-
-| File | Purpose |
-|---|---|
-| `PRD.md` | What the product must do, API rules, the five UI states, acceptance checklist |
-| `DESIGN.md` | Visual tokens, layouts, responsive and accessibility rules |
-| `PROPOSAL.md` | The original project proposal |
-| `index.html`, `css/styles.css`, `js/script.js` | The app |
-
-## Known limits
-
-- Only the Art Institute of Chicago is searched, and only public-domain paintings with images.
-- Category buttons are search hints (for example, Nature searches "landscape"), not exact art-historical classifications.
-- The room uses CSS perspective only (no 3D library). Below 600px wide it becomes a flat list of the three walls.
-- Display status is whatever the museum reports at the moment you open a painting.
+**How I fixed it:** I asked for the exhibition to be a separate tab, and the agent made the change in the commit above. The page now has two tabs, **Artworks** and **Exhibition**, and only one shows at a time. The jump links are gone. The Exhibition tab label shows how many paintings are chosen (for example `2/6`), and "New Exhibition" now sits inside the Exhibition tab.
