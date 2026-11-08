@@ -157,7 +157,14 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .studio { padding: var(--space-4); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); max-width: 1400px; margin: 0 auto; }
 .panel { min-width: 0; }
 .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
-.jump-link { font-size: 0.9rem; color: var(--color-muted); }
+.panel[hidden] { display: none; }
+.panel-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+#exhibition { max-width: 900px; width: 100%; margin: 0 auto; }
+.tabs { display: flex; gap: var(--space-2); max-width: 1400px; margin: 0 auto; padding: var(--space-3) var(--space-4) 0; border-bottom: 1px solid var(--color-border); }
+.tab { font: inherit; background: none; border: 0; border-bottom: 3px solid transparent; padding: var(--space-2) var(--space-4); cursor: pointer; color: var(--color-muted); font-weight: 600; }
+.tab[aria-selected="true"] { color: inherit; border-bottom-color: currentColor; }
+.tab-count { font-weight: 400; font-size: 0.85em; margin-left: 0.25em; }
+body[data-mode="gallery"] .tabs { display: none; }
 
 .site-footer { padding: var(--space-6) var(--space-4); color: var(--color-muted); font-size: 0.875rem; max-width: 1400px; margin: 0 auto; }
 .site-footer a { color: inherit; }
@@ -165,8 +172,7 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 /* Media query = "only apply these rules if the screen is at least 1000px wide".
    On desktops the two panels sit side by side, 45% / 55% ("fr" = a share of the space). */
 @media (min-width: 1000px) {
-  .studio { grid-template-columns: minmax(0, 45fr) minmax(0, 55fr); gap: var(--space-6); padding: var(--space-6); }
-  .jump-link { display: none; }
+  .studio { padding: var(--space-6); }
 }
 
 /* ---------- 5. Discover ---------- */

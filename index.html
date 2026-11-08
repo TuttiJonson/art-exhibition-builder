@@ -18,18 +18,22 @@
     </div>
     <nav class="header-actions" aria-label="Exhibition actions">
       <button type="button" id="edit-btn" class="btn btn-secondary" hidden>Edit Exhibition</button>
-      <button type="button" id="new-btn" class="btn btn-quiet">New Exhibition</button>
       <button type="button" id="collection-btn" class="btn btn-primary" aria-haspopup="dialog"><span>My Collection (<span id="collection-count">0</span>/6)</span></button>
     </nav>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tab-artworks" class="tab" data-tab="artworks" aria-controls="discover" aria-selected="true">Artworks</button>
+    <button type="button" role="tab" id="tab-exhibition" class="tab" data-tab="exhibition" aria-controls="exhibition" aria-selected="false" tabindex="-1">Exhibition <span class="tab-count" id="tab-count">0/6</span></button>
+  </nav>
+
   <main id="main" class="studio">
 
     <!-- ============ DISCOVER ============ -->
-    <section id="discover" class="panel" aria-labelledby="discover-title">
+    <section id="discover" class="panel" role="tabpanel" aria-labelledby="tab-artworks">
       <div class="panel-head">
         <h2 id="discover-title">Discover</h2>
-        <a class="jump-link" href="#exhibition">Skip to your exhibition</a>
+        <button type="button" class="btn btn-secondary btn-small" id="to-exhibition-btn">View my exhibition</button>
       </div>
 
       <form id="search-form" role="search" novalidate>
@@ -57,10 +61,13 @@
     </section>
 
     <!-- ============ YOUR EXHIBITION ============ -->
-    <section id="exhibition" class="panel" aria-labelledby="exhibition-title">
+    <section id="exhibition" class="panel" role="tabpanel" aria-labelledby="tab-exhibition" hidden>
       <div class="panel-head editor-only">
         <h2 id="exhibition-title" tabindex="-1">Your Exhibition</h2>
-        <a class="jump-link" href="#discover">Back to Discover</a>
+        <div class="panel-actions">
+          <button type="button" id="new-btn" class="btn btn-quiet btn-small">New Exhibition</button>
+          <button type="button" class="btn btn-secondary btn-small" id="to-artworks-btn">Add artworks</button>
+        </div>
       </div>
 
       <p id="storage-notice" class="notice" role="status" hidden></p>

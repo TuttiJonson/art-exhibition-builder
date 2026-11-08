@@ -150,6 +150,10 @@ const els = {
   collectionCount: $('collection-count'),
   newBtn: $('new-btn'),
   editBtn: $('edit-btn'),
+  tabs: [...document.querySelectorAll('.tab')],
+  tabCount: $('tab-count'),
+  discover: $('discover'),
+  exhibitionPanel: $('exhibition'),
   searchForm: $('search-form'),
   searchInput: $('search-input'),
   searchBtn: $('search-btn'),
@@ -792,6 +796,7 @@ function renderCounter() {
   els.collectionCount.textContent = n;
   els.drawerCount.textContent = n;
   els.counterNum.textContent = n;
+  els.tabCount.textContent = `${n}/${MAX_ARTWORKS}`;
 }
 
 // The 3D room is turned with CSS, not JavaScript. We only set an attribute: data-wall="left".
@@ -1196,7 +1201,22 @@ function setMode(mode) {
   const gallery = mode === 'gallery';
   els.galleryHeading.hidden = !gallery;
   els.editBtn.hidden = !gallery;
-  els.newBtn.hidden = gallery;
+  if (gallery) setTab('exhibition');
+}
+
+// Two tabs: "artworks" (find paintings) and "exhibition" (arrange and name them).
+// Only one panel is visible at a time, so the visitor focuses on one job at a time.
+function setTab(tab, { focusTab = false } = {}) {
+  ui.tab = tab;
+  els.tabs.forEach((btn) => {
+    const on = btn.dataset.tab === tab;
+    btn.setAttribute('aria-selected', String(on));
+    btn.tabIndex = on ? 0 : -1;
+    if (on && focusTab) btn.focus();
+  });
+  els.discover.hidden = tab !== 'artworks';
+  els.exhibitionPanel.hidden = tab !== 'exhibition';
+  window.scrollTo(0, 0);
 }
 
 function openOpening() {
@@ -1245,16 +1265,30 @@ function bindEvents() {
     if (opener && opener.isConnected && (document.activeElement === document.body || !document.activeElement)) opener.focus();
   });
 
+  els.tabs.forEach((btn, i) => {
+    btn.addEventListener('click', () => { setMode('studio'); setTab(btn.dataset.tab); });
+    btn.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+      const next = els.tabs[(i + (event.key === 'ArrowRight' ? 1 : els.tabs.length - 1)) % els.tabs.length];
+      setMode('studio');
+      setTab(next.dataset.tab, { focusTab: true });
+    });
+  });
+  document.getElementById('to-exhibition-btn').addEventListener('click', () => setTab('exhibition'));
+  document.getElementById('to-artworks-btn').addEventListener('click', () => setTab('artworks'));
+
   els.collectionBtn.addEventListener('click', openDrawer);
   els.newBtn.addEventListener('click', () => els.confirmDialog.showModal());
   els.confirmNewBtn.addEventListener('click', () => { els.confirmDialog.close(); startNewExhibition(); });
   els.editBtn.addEventListener('click', () => {
     setMode('studio');
+    setTab('exhibition');
     els.titleInput.focus();
   });
   els.browseBtn.addEventListener('click', () => {
     els.drawer.close();
     setMode('studio');
+    setTab('artworks');
     els.searchInput.focus();
   });
 
@@ -1426,6 +1460,7 @@ function init() {
   syncControlsFromExhibition();
   bindEvents();
   setMode('studio');
+  setTab('artworks');
   renderAll();
   loadDiscover({ kind: 'featured' });   // the page is useful right away
   fillMissingSubjects();
