@@ -277,7 +277,7 @@ function attachImageFallback(img) {
 }
 
 function artImage(art) {
-  return attachImageFallback(el('img', { src: art.imageUrl, alt: art.altText, loading: 'lazy', decoding: 'async' }));
+  return attachImageFallback(el('img', { src: art.imageUrl, alt: art.altText, loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' }));
 }
 
 // Museum descriptions can contain HTML. DOMParser makes an inert document (nothing runs or loads),
