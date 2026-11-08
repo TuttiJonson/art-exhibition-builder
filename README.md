@@ -1,7 +1,7 @@
 # ATELIER — art exhibition builder
 
 **Live site:** https://tuttijonson.github.io/art-exhibition-builder/
-
+**Live site Vercel:** https://art-exhibition-builder.vercel.app
 
 ## What it does
 
